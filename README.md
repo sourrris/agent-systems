@@ -1,79 +1,151 @@
-# Agent Systems Installer CLI
+# 🤖 Agent Systems
 
-Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for **Claude Code**, **Cursor**, **Codex**, and **Antigravity**.
+Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, and **Antigravity**.
 
-This repository publishes a zero-dependency CLI tool (`agent-systems`) that automatically initializes and standardizes agent guidelines in any codebase, providing immediate alignment and safety policies.
+[![NPM Version](https://img.shields.io/npm/v/agent-systems.svg?style=flat-round&color=007ACC)](https://www.npmjs.com/package/agent-systems)
+[![License](https://img.shields.io/github/license/sourrrish/agent-systems.svg?style=flat-round&color=708090)](LICENSE)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-green.svg?style=flat-round)](package.json)
+
+**Agent Systems** provides a zero-dependency, plug-and-play CLI to instantly bootstrap production-grade, multi-agent coordination frameworks and strict security safeguards directly into any codebase. It standardizes how AI agents analyze, plan, execute, review, and self-improve while ensuring prompt injection resistance and robust code quality gates.
 
 ---
 
-## 🚀 Quick Start
+## ⚡ Quick Start
 
-Initialize the agent configuration files in your current workspace:
+Initialize standard configuration profiles, markdown rules, and environment constraints in your workspace directory instantly:
 
 ```bash
 npx agent-systems
-# OR
+# Or use the singular alias
 npx agent-system
 ```
 
-This will automatically create/copy the standard configuration folders, markdown instructions, and append necessary rules to your `.gitignore`.
+This command automatically configures standard directories, defines platform-specific rules, and updates your `.gitignore` with safe defaults.
 
-### Overwriting Existing Configurations
-
-To force overwrite existing configs (e.g. updating to the latest templates), pass the `--force` or `-f` flag:
+### Options & Flags
 
 ```bash
+# Overwrite existing files (bypassing interactive prompts)
 npx agent-systems --force
+
+# Initialize in a specific subdirectory
+npx agent-systems ./my-project-dir
+
+# View full usage instructions
+npx agent-systems --help
 ```
 
 ---
 
-## 🛠️ What gets installed?
+## 🎯 Key Features
 
-The initializer copies the following files and directories into the target repository:
-
-### 1. `.agent-system/` (General / Antigravity)
-- `project/profile.md`: Defining the project purposes, tech stack, coding boundaries, and definition of done (requires customization after initialization).
-- `core/`: Protocols and policies (Operating Protocol, Security Policy, Self Improvement, Context Engineering, Quality Gates, Orchestration).
-- `contracts/`: Core data contracts for agents (Task contract, Eval cases, Skill proposals, etc.).
-- `memory/`: Repository memory layouts and instructions.
-- `evals/`: Evaluation cases.
-
-### 2. `.claude/` (Claude Code)
-- `settings.json`: Security rules denying the agent from reading `.env`, `.pem`, `.key`, and other secrets.
-- `agents/`: Custom persona files (`investigator`, `planner`, `implementer`, `reviewer`, `verifier`, `skill-librarian`, `doitforme`).
-- `skills/`: Basic operational agent skills.
-
-### 3. `.agents/` (Cursor)
-- `skills/`: Cursor agent skills matching the system definitions.
-
-### 4. `.codex/` (Codex)
-- `agents/`: Custom persona configurations in TOML format (`planner`, `reviewer`, `verifier`, `investigator`, `implementer`, `doitforme`, `skill_librarian`).
-
-### 5. Repository Markdown Instructions
-- `AGENTS.md`: Repository level instructions for Cursor & general agents.
-- `CLAUDE.md`: Repository instructions specific to Claude Code.
+*   **🌐 Cross-Platform Standards**: Uniform profiles and configurations for **Cursor**, **Claude Code**, **Codex**, and **Antigravity**.
+*   **🔒 Strict Security Guardrails**: Built-in rules that prevent AI agents from reading, printing, copying, or committing `.env` files, PEM keys, and access tokens.
+*   **🧬 Multi-Agent Orchestration**: Standardizes distinct agent persona roles (`investigator`, `planner`, `implementer`, `reviewer`, `verifier`, `skill-librarian`) to handle complex workflows safely.
+*   **🛡️ Prompt Injection Resistance**: Instructs agents to treat external text, issues, and logs strictly as data rather than executable instructions.
+*   **📈 Quality Gates**: Establishes unambiguous definitions of done, requirement mapping, and verification check hierarchies.
+*   **🔄 Local Learning Loops**: Auto-generates folders for capturing durable, reusable context/skills without bloating global agent files.
 
 ---
 
-## 📦 NPM Package Details
+## 📂 Anatomy of Installed Components
 
-### Commands
-- `init [path]`: Copies agent systems configuration to the specified path (defaults to `.`).
-- `help` / `-h` / `--help`: Shows CLI help.
-- `version` / `-v` / `--version`: Shows package version.
+When initialized, `agent-systems` installs the following layout:
 
-### Local Installation & Development
-
-To link and test the CLI locally:
-
-```bash
-npm link
-agent-system --help
+```text
+your-project/
+├── .agent-system/               # General agent core standard
+│   ├── core/
+│   │   ├── context-engineering.md  # Rules for managing token scope
+│   │   ├── operating-protocol.md   # Standard step-by-step task loop
+│   │   ├── orchestration.md        # Persona separation & subagent control
+│   │   ├── quality-gates.md         # Requirements to verify before finish
+│   │   ├── security-policy.md      # Commands, dependencies, and secret rules
+│   │   └── self-improvement.md     # Guidelines for learning loops & skill library
+│   ├── contracts/                  # Shared data schemas for multi-agent runs
+│   │   ├── agent-result.md
+│   │   ├── context-packet.md
+│   │   ├── eval-case.md
+│   │   ├── skill-proposal.md
+│   │   └── task-contract.md
+│   ├── project/
+│   │   ├── profile.md              # Project purpose, frameworks, and commands (customizable)
+│   │   └── improvement-settings.json
+│   ├── candidates/                 # Folder for holding new skill candidates
+│   ├── memory/                     # Directory for agent state & memory maps
+│   └── evals/                      # Directory for verification/evaluation test cases
+├── .claude/                     # Claude Code configurations
+│   ├── settings.json               # Hard security path exclusions
+│   └── agents/                     # Persona prompts (investigator, planner, etc.)
+├── .agents/                     # Cursor capabilities
+│   └── skills/                     # Custom instructions & operational skills
+├── .codex/                      # Codex agent settings
+│   └── agents/                     # TOML persona configurations
+├── AGENTS.md                    # Root instructions for Cursor/generic agents
+└── CLAUDE.md                    # Root instructions for Claude Code
 ```
+
+---
+
+## 🚀 The Multi-Agent Orchestration Architecture
+
+For complex, high-risk, or context-heavy tasks, `agent-systems` divides labor across highly specialized personas:
+
+| Persona | Primary Responsibility | Key Output |
+| :--- | :--- | :--- |
+| **🕵️ Investigator** | Scopes the codebase, analyzes existing patterns, and gathers ground truths. | Context Packet |
+| **📋 Planner** | Formulates step-by-step implementation sequences and validation strategies. | Task Contract |
+| **💻 Implementer** | Authors minimal, backward-compatible, clean, and typed code changes. | Small Coherent Patch |
+| **🔎 Reviewer** | Performs independent static checks against code quality rules. | Critique & Lint Feedback |
+| **✅ Verifier** | Executes tests and provides concrete, fresh verification evidence. | Execution Logs |
+| **📚 Skill Librarian** | Curates, optimizes, and registers durable, reusable procedures. | Skill Proposal |
+
+---
+
+## 📈 Six-Stage Quality Gates
+
+All task execution flows are governed by rigorous quality gates to prevent regression:
+
+1.  **Gate 1: Requirement**: Concrete acceptance criteria, known non-goals, and surfaced assumptions.
+2.  **Gate 2: Design**: Target execution path identified and validation strategy established.
+3.  **Gate 3: Patch**: Verification that changes are limited to scope, errors are handled, and no debug placeholders remain.
+4.  **Gate 4: Independent Review**: Mandatory peer review check for medium/high-risk tasks to flag potential bugs or schema incompatibilities.
+5.  **Gate 5: Verification**: Execution of tests with real evidence (no "should pass" or simulated results).
+6.  **Gate 6: Completion**: Acceptance evidence generated, residual risks reported, and final diff verified.
+
+---
+
+## 🧠 Self-Improvement & Reusable Skills
+
+The system enables agents to self-improve dynamically without bloating main prompt files. When a specific multi-step procedure is used multiple times or a recurring failure is resolved:
+1.  The agent proposes a **Skill Candidate** in `.agent-system/candidates/`.
+2.  The candidate must include a focused definition, imperative instructions, and evaluation test cases.
+3.  Upon successful validation (manual or auto-promotion mode), the skill is promoted to the global system skill library.
+
+---
+
+## 🛠️ Local Development & Contributing
+
+To build, link, and run the CLI tool locally for testing or custom updates:
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/sourrrish/agent-systems.git
+    cd agent-systems
+    ```
+2.  Link the package locally:
+    ```bash
+    npm link
+    ```
+3.  Run the CLI tool anywhere on your local machine:
+    ```bash
+    agent-system --help
+    # Or using the plural form
+    agent-systems --help
+    ```
 
 ---
 
 ## 📄 License
 
-MIT
+This project is licensed under the [MIT License](LICENSE).
