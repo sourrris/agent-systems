@@ -4,8 +4,8 @@
   "description": "Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for Cursor, Claude Code, Codex, and Antigravity.",
   "type": "module",
   "bin": {
-    "agent-system": "./bin/cli.js",
-    "agent-systems": "./bin/cli.js"
+    "agent-system": "bin/cli.js",
+    "agent-systems": "bin/cli.js"
   },
   "files": [
     "bin",

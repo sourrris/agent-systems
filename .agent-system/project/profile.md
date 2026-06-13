@@ -1,64 +1,52 @@
 # Project Profile
 
-Replace every `TODO` before relying on autonomous implementation.
+This profile outlines the repository's technology stack, commands, boundaries, and conventions.
 
 ## Repository purpose
 
-TODO: Describe the product, users, and critical business behavior.
+A zero-dependency CLI utility (`agent-systems` / `agent-system`) used to bootstrap standard agent environment configurations, operating protocols, and security policies into target repositories.
 
 ## Technology
 
-- Primary languages: TODO
-- Frameworks: TODO
-- Package manager: TODO
-- Runtime versions: TODO
-- Database and infrastructure: TODO
+- Primary languages: JavaScript (ES Modules, Node.js)
+- Frameworks: None (Vanilla JS CLI)
+- Package manager: npm
+- Runtime versions: Node.js >= 16.7.0
+- Database and infrastructure: None
 
 ## Commands
 
-Use exact commands. Delete commands that do not apply.
+Use exact commands.
 
 ```bash
-# Install
-TODO
+# Install dependencies
+npm install
 
-# Fast checks
-TODO
+# Link package locally for CLI development/testing
+npm link
 
-# Lint
-TODO
-
-# Type check
-TODO
-
-# Unit tests
-TODO
-
-# Integration tests
-TODO
-
-# Full verification
-TODO
-
-# Build
-TODO
+# Run help command locally
+node bin/cli.js --help
 ```
 
 ## Architecture boundaries
 
-- TODO: State where domain logic belongs.
-- TODO: State allowed dependency direction.
-- TODO: State public API compatibility requirements.
-- TODO: State data migration rules.
-- TODO: State generated-code locations.
+- CLI execution logic is located in `bin/cli.js`.
+- The templates and configuration files copied to user repositories are stored in:
+  - `.agent-system/`
+  - `.agents/`
+  - `.claude/`
+  - `.codex/`
+  - `AGENTS.md`
+  - `CLAUDE.md`
+- Public CLI compatibility must be maintained for arguments (`init [path]`, `-f`, `--force`, `-h`, `--help`, `-v`, `--version`).
 
 ## Coding conventions
 
-- Follow existing local conventions before introducing new patterns.
-- Prefer readable, typed, testable code.
-- Do not add a production dependency without explicit justification.
-- Do not perform broad refactors inside an unrelated change.
-- TODO: Add naming, formatting, error-handling, and logging conventions.
+- Use standard ES Modules (`import`/`export`) and standard Node.js built-in APIs (`fs`, `path`, `readline`, `url`).
+- Keep the codebase zero-dependency.
+- Ensure cross-platform compatibility of file system paths using standard `path` utilities.
+- Gracefully handle file conflicts by checking for differences and prompting for overwrite when running interactively.
 
 ## Protected and sensitive paths
 
@@ -77,29 +65,19 @@ build/
 vendor/
 ```
 
-TODO: Add repository-specific protected paths.
-
 ## Risk classification overrides
 
 Always classify these as high risk:
 
-- authentication and authorization;
-- cryptography and secret handling;
-- billing, money, or irreversible side effects;
-- schema migrations and destructive data operations;
-- concurrency and distributed consistency;
-- public API or serialization changes;
+- npm package publishing and package version bumping;
+- CLI command argument parsing changes;
 - CI/CD, deployment, or production configuration.
-
-TODO: Add project-specific high-risk domains.
 
 ## Definition of done
 
 A change is complete only when:
 
 1. acceptance criteria are satisfied;
-2. relevant tests were added or updated;
-3. the narrowest useful checks pass;
-4. broader checks were run when risk justifies them;
-5. no unrelated changes were introduced;
-6. remaining uncertainty is reported honestly.
+2. the narrowest useful checks pass;
+3. no unrelated changes were introduced;
+4. remaining uncertainty is reported honestly.

@@ -2,9 +2,9 @@
 
 Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, and **Antigravity**.
 
-[![NPM Version](https://img.shields.io/npm/v/agent-systems.svg?style=flat-round&color=007ACC)](https://www.npmjs.com/package/agent-systems)
-[![License](https://img.shields.io/github/license/sourrrish/agent-systems.svg?style=flat-round&color=708090)](LICENSE)
-[![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-green.svg?style=flat-round)](package.json)
+[![NPM Version](https://img.shields.io/npm/v/agent-systems?style=flat&color=007ACC)](https://www.npmjs.com/package/agent-systems)
+[![License](https://img.shields.io/github/license/sourrris/agent-systems?style=flat&color=708090)](LICENSE)
+[![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-green?style=flat)](package.json)
 
 **Agent Systems** provides a zero-dependency, plug-and-play CLI to instantly bootstrap production-grade, multi-agent coordination frameworks and strict security safeguards directly into any codebase. It standardizes how AI agents analyze, plan, execute, review, and self-improve while ensuring prompt injection resistance and robust code quality gates.
 
