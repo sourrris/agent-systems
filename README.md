@@ -1,40 +1,79 @@
+# Agent Systems Installer CLI
 
+Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for **Claude Code**, **Cursor**, **Codex**, and **Antigravity**.
 
-# Student Management System (SMS)
+This repository publishes a zero-dependency CLI tool (`agent-systems`) that automatically initializes and standardizes agent guidelines in any codebase, providing immediate alignment and safety policies.
 
-A simple command-line application for managing students, courses, and enrollments.
+---
 
-## Features
-- **Student Management:** Add, list, and delete students.
-- **Course Management:** Add, list, and delete courses.
-- **Enrollment:** Enroll students in courses and manage grades.
-- **Persistence:** Data is stored in a local SQLite database (`sms.db`).
-- **Validation:** Prevent enrolling non-existent students into non-existent courses.
-- **Interface:** A clean Command Line Interface (CLI) for all operations.
+## 🚀 Quick Start
 
-## Installation
-1. Clone the repository.
-2. Create a virtual environment:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+Initialize the agent configuration files in your current workspace:
 
-## Usage
-Run the application using the `main.py` script:
 ```bash
-python3 main.py
+npx agent-systems
+# OR
+npx agent-system
 ```
 
+This will automatically create/copy the standard configuration folders, markdown instructions, and append necessary rules to your `.gitignore`.
+
+### Overwriting Existing Configurations
+
+To force overwrite existing configs (e.g. updating to the latest templates), pass the `--force` or `-f` flag:
+
+```bash
+npx agent-systems --force
+```
+
+---
+
+## 🛠️ What gets installed?
+
+The initializer copies the following files and directories into the target repository:
+
+### 1. `.agent-system/` (General / Antigravity)
+- `project/profile.md`: Defining the project purposes, tech stack, coding boundaries, and definition of done (requires customization after initialization).
+- `core/`: Protocols and policies (Operating Protocol, Security Policy, Self Improvement, Context Engineering, Quality Gates, Orchestration).
+- `contracts/`: Core data contracts for agents (Task contract, Eval cases, Skill proposals, etc.).
+- `memory/`: Repository memory layouts and instructions.
+- `evals/`: Evaluation cases.
+
+### 2. `.claude/` (Claude Code)
+- `settings.json`: Security rules denying the agent from reading `.env`, `.pem`, `.key`, and other secrets.
+- `agents/`: Custom persona files (`investigator`, `planner`, `implementer`, `reviewer`, `verifier`, `skill-librarian`, `doitforme`).
+- `skills/`: Basic operational agent skills.
+
+### 3. `.agents/` (Cursor)
+- `skills/`: Cursor agent skills matching the system definitions.
+
+### 4. `.codex/` (Codex)
+- `agents/`: Custom persona configurations in TOML format (`planner`, `reviewer`, `verifier`, `investigator`, `implementer`, `doitforme`, `skill_librarian`).
+
+### 5. Repository Markdown Instructions
+- `AGENTS.md`: Repository level instructions for Cursor & general agents.
+- `CLAUDE.md`: Repository instructions specific to Claude Code.
+
+---
+
+## 📦 NPM Package Details
+
 ### Commands
-- `student add <name> <student_id>`: Add a new student.
-- `student list`: List all students.
-- `student delete <student_id>`: Delete a student by their database ID.
-- `course add <title> <course_code>`: Add a new course.
-- `course list`: List all courses.
-- `course delete <course_id>`: Delete a course by its database ID.
-- `enroll <student_id> <course_id> --grade <grade>`: Enroll a student in a course.
+- `init [path]`: Copies agent systems configuration to the specified path (defaults to `.`).
+- `help` / `-h` / `--help`: Shows CLI help.
+- `version` / `-v` / `--version`: Shows package version.
+
+### Local Installation & Development
+
+To link and test the CLI locally:
+
+```bash
+npm link
+agent-system --help
+```
+
+---
+
+## 📄 License
+
+MIT
