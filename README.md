@@ -1,4 +1,4 @@
-# 🤖 Agent Systems
+# Agent Systems
 
 Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, and **Antigravity**.
 
