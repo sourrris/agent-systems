@@ -142,7 +142,7 @@ To build, link, and run the CLI tool locally for testing or custom updates:
 
 1.  Clone the repository:
     ```bash
-    git clone https://github.com/sourrrish/agent-systems.git
+    git clone https://github.com/sourrris/agent-systems.git
     cd agent-systems
     ```
 2.  Link the package locally:
