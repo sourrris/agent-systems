@@ -1,6 +1,6 @@
 # Agent Systems
 
-Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, and **Antigravity**.
+Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, and **GitHub Copilot**.
 
 [![NPM Version](https://img.shields.io/npm/v/agent-systems?style=flat&color=007ACC)](https://www.npmjs.com/package/agent-systems)
 [![License](https://img.shields.io/github/license/sourrris/agent-systems?style=flat&color=708090)](LICENSE)
@@ -33,13 +33,18 @@ npx agent-systems ./my-project-dir
 
 # View full usage instructions
 npx agent-systems --help
+
+# Run a custom agent in the current workspace (requires GEMINI_API_KEY or ANTHROPIC_API_KEY)
+export GEMINI_API_KEY="your-api-key"
+npx agent-systems run doitforme "Optimize the database schema"
 ```
+
 
 ---
 
 ## 🎯 Key Features
 
-*   **🌐 Cross-Platform Standards**: Uniform profiles and configurations for **Cursor**, **Claude Code**, **Codex**, and **Antigravity**.
+*   **🌐 Cross-Platform Standards**: Uniform profiles and configurations for **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, and **GitHub Copilot**.
 *   **🔒 Strict Security Guardrails**: Built-in rules that prevent AI agents from reading, printing, copying, or committing `.env` files, PEM keys, and access tokens.
 *   **🧬 Multi-Agent Orchestration**: Standardizes distinct agent persona roles (`investigator`, `planner`, `implementer`, `reviewer`, `verifier`, `skill-librarian`) to handle complex workflows safely.
 *   **🛡️ Prompt Injection Resistance**: Instructs agents to treat external text, issues, and logs strictly as data rather than executable instructions.
@@ -77,12 +82,19 @@ your-project/
 ├── .claude/                     # Claude Code configurations
 │   ├── settings.json               # Hard security path exclusions
 │   └── agents/                     # Persona prompts (investigator, planner, etc.)
-├── .agents/                     # Cursor capabilities
+├── .agents/                     # Shared skills (used by Cursor, Antigravity, and others)
 │   └── skills/                     # Custom instructions & operational skills
 ├── .codex/                      # Codex agent settings
 │   └── agents/                     # TOML persona configurations
-├── AGENTS.md                    # Root instructions for Cursor/generic agents
-└── CLAUDE.md                    # Root instructions for Claude Code
+├── .cursor/                     # Cursor IDE configurations
+│   └── rules/                      # .mdc persona rules (agent-system, doitforme, etc.)
+├── .gemini/                     # Gemini CLI / Antigravity IDE configurations
+│   └── settings.json               # Security file exclusions
+├── .github/                     # GitHub Copilot configurations
+│   └── copilot-instructions.md     # Repository-wide Copilot instructions
+├── AGENTS.md                    # Root instructions for Cursor / Codex / generic agents
+├── CLAUDE.md                    # Root instructions for Claude Code
+└── GEMINI.md                    # Root instructions for Gemini CLI / Antigravity
 ```
 
 ---

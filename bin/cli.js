@@ -5,6 +5,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
 import os from 'os';
+import https from 'https';
+import { exec } from 'child_process';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
@@ -33,6 +35,7 @@ const showHelp = () => {
   console.log('  npx agent-system [command] [options]\n');
   console.log(`${colors.bright}Commands:${colors.reset}`);
   console.log('  init [path]       Initialize agent systems in the target directory (default: current directory)');
+  console.log('  run <agent> [msg] Run a custom agent (e.g. doitforme) in the current workspace');
   console.log('  help              Show this help message');
   console.log('  version           Show version info\n');
   console.log(`${colors.bright}Options:${colors.reset}`);
@@ -66,6 +69,383 @@ function getAllFiles(dir, baseDir = dir) {
   return files;
 }
 
+// HTTP request helper using native https module
+function makeRequest(urlStr, headers, body) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlStr);
+    const options = {
+      method: 'POST',
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          resolve(data);
+        } else {
+          reject(new Error(`API responded with status code ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => {
+      reject(err);
+    });
+
+    req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+
+// Gemini API integration
+async function callGemini(systemInstruction, messages) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY environment variable is not set');
+
+  const contents = messages.map(m => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }]
+  }));
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${apiKey}`;
+  const body = {
+    contents,
+    systemInstruction: {
+      parts: [{ text: systemInstruction }]
+    },
+    generationConfig: {
+      temperature: 0.2
+    }
+  };
+
+  const responseText = await makeRequest(url, {}, body);
+  const resultJson = JSON.parse(responseText);
+  
+  if (resultJson.candidates && resultJson.candidates[0] && resultJson.candidates[0].content && resultJson.candidates[0].content.parts[0]) {
+    return resultJson.candidates[0].content.parts[0].text;
+  }
+  throw new Error(`Unexpected Gemini response format: ${responseText}`);
+}
+
+// Anthropic API integration
+async function callAnthropic(systemInstruction, messages) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY environment variable is not set');
+
+  const url = 'https://api.anthropic.com/v1/messages';
+  const headers = {
+    'x-api-key': apiKey,
+    'anthropic-version': '2023-06-01'
+  };
+
+  const body = {
+    model: 'claude-3-5-sonnet-20241022',
+    max_tokens: 4000,
+    system: systemInstruction,
+    messages: messages.map(m => ({
+      role: m.role,
+      content: m.content
+    }))
+  };
+
+  const responseText = await makeRequest(url, headers, body);
+  const resultJson = JSON.parse(responseText);
+
+  if (resultJson.content && resultJson.content[0] && resultJson.content[0].text) {
+    return resultJson.content[0].text;
+  }
+  throw new Error(`Unexpected Anthropic response format: ${responseText}`);
+}
+
+// Master LLM Router
+async function callLLM(systemInstruction, messages) {
+  if (process.env.GEMINI_API_KEY) {
+    return await callGemini(systemInstruction, messages);
+  } else if (process.env.ANTHROPIC_API_KEY) {
+    return await callAnthropic(systemInstruction, messages);
+  } else {
+    throw new Error('Please set GEMINI_API_KEY or ANTHROPIC_API_KEY environment variable.');
+  }
+}
+
+// Load configurations from current dir or global home directory
+function loadAgentInstructions(agentName, destDir) {
+  let systemInstructions = '';
+
+  const filesToLoad = [
+    'AGENTS.md',
+    '.agent-system/core/operating-protocol.md',
+    '.agent-system/core/orchestration.md',
+    '.agent-system/core/quality-gates.md',
+    '.agent-system/core/security-policy.md',
+    '.agent-system/core/self-improvement.md',
+    '.agent-system/project/profile.md'
+  ];
+
+  for (const relPath of filesToLoad) {
+    let filePath = path.join(destDir, relPath);
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(os.homedir(), relPath);
+    }
+    if (fs.existsSync(filePath)) {
+      systemInstructions += `\n=== ${relPath} ===\n${fs.readFileSync(filePath, 'utf8')}\n`;
+    }
+  }
+
+  const agentPaths = [
+    path.join(destDir, '.claude', 'agents', `${agentName}.md`),
+    path.join(destDir, '.codex', 'agents', `${agentName}.toml`),
+    path.join(os.homedir(), '.claude', 'agents', `${agentName}.md`),
+    path.join(os.homedir(), '.codex', 'agents', `${agentName}.toml`)
+  ];
+
+  let agentInstructions = '';
+  for (const aPath of agentPaths) {
+    if (fs.existsSync(aPath)) {
+      agentInstructions = fs.readFileSync(aPath, 'utf8');
+      break;
+    }
+  }
+
+  if (!agentInstructions) {
+    console.warn(`${colors.yellow}Warning:${colors.reset} Custom instructions for agent "${agentName}" not found. Running with core system guidelines only.`);
+  }
+
+  return {
+    systemInstructions: systemInstructions.trim(),
+    agentInstructions: agentInstructions.trim()
+  };
+}
+
+// Tool Definition Schema description for LLM system prompt
+const TOOLS_DEFINITION = `
+You have access to the following tools in your environment. You can call them by outputting an XML block in your response. 
+
+Available Tools:
+1. read_file:
+   Usage: <tool_call name="read_file">path/to/file</tool_call>
+2. write_file:
+   Usage: <tool_call name="write_file">
+   <path>path/to/file</path>
+   <content>file_content_here</content>
+   </tool_call>
+3. run_command:
+   Usage: <tool_call name="run_command">command_to_run</tool_call>
+4. list_dir:
+   Usage: <tool_call name="list_dir">path/to/dir</tool_call>
+5. grep_search:
+   Usage: <tool_call name="grep_search">
+   <query>search_query</query>
+   <path>path/to/search</path>
+   </tool_call>
+
+Safety Notice: All writes and shell commands will require manual approval from the user in their terminal before execution.
+`;
+
+function askConfirmation(rl, message) {
+  return new Promise((resolve) => {
+    rl.question(`${colors.yellow}${colors.bright}?${colors.reset} ${message} (y/N): `, (answer) => {
+      resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
+    });
+  });
+}
+
+// Tool Executor
+async function executeTool(name, content, rl, destDir) {
+  console.log(`\n${colors.cyan}${colors.bright}🔧 [Executing Tool: ${name}]${colors.reset}`);
+  
+  if (name === 'read_file') {
+    const rawPath = content.trim();
+    const filePath = path.resolve(destDir, rawPath);
+    if (!fs.existsSync(filePath)) {
+      return `Error: File does not exist at ${rawPath}`;
+    }
+    try {
+      const data = fs.readFileSync(filePath, 'utf8');
+      return `File ${rawPath} read successfully:\n${data}`;
+    } catch (err) {
+      return `Error reading file: ${err.message}`;
+    }
+  }
+
+  if (name === 'write_file') {
+    const pathMatch = content.match(/<path>([\s\S]*?)<\/path>/);
+    const contentMatch = content.match(/<content>([\s\S]*?)<\/content>/);
+    if (!pathMatch || !contentMatch) {
+      return `Error: write_file call must include <path> and <content> tags.`;
+    }
+    const rawPath = pathMatch[1].trim();
+    const fileContent = contentMatch[1];
+    const filePath = path.resolve(destDir, rawPath);
+
+    const approved = await askConfirmation(rl, `Approve writing/updating file "${rawPath}"?`);
+    if (!approved) {
+      return `User rejected the write operation to "${rawPath}".`;
+    }
+
+    try {
+      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.writeFileSync(filePath, fileContent, 'utf8');
+      return `File ${rawPath} written successfully.`;
+    } catch (err) {
+      return `Error writing file: ${err.message}`;
+    }
+  }
+
+  if (name === 'run_command') {
+    const cmd = content.trim();
+    const approved = await askConfirmation(rl, `Approve running shell command: "${colors.bright}${cmd}${colors.reset}"?`);
+    if (!approved) {
+      return `User rejected execution of command: "${cmd}".`;
+    }
+
+    return new Promise((resolve) => {
+      exec(cmd, { cwd: destDir }, (err, stdout, stderr) => {
+        let result = '';
+        if (stdout) result += `STDOUT:\n${stdout}\n`;
+        if (stderr) result += `STDERR:\n${stderr}\n`;
+        if (err) result += `Command failed with exit code ${err.code || 1}\n`;
+        resolve(result || 'Command finished with no output.');
+      });
+    });
+  }
+
+  if (name === 'list_dir') {
+    const rawPath = content.trim() || '.';
+    const dirPath = path.resolve(destDir, rawPath);
+    if (!fs.existsSync(dirPath)) {
+      return `Error: Directory does not exist at ${rawPath}`;
+    }
+    try {
+      const items = fs.readdirSync(dirPath);
+      const list = items.map(item => {
+        const full = path.join(dirPath, item);
+        const stat = fs.statSync(full);
+        return `${stat.isDirectory() ? '[DIR]' : '[FILE]'} ${item}`;
+      });
+      return `Directory listing of "${rawPath}":\n${list.join('\n')}`;
+    } catch (err) {
+      return `Error listing directory: ${err.message}`;
+    }
+  }
+
+  if (name === 'grep_search') {
+    const queryMatch = content.match(/<query>([\s\S]*?)<\/query>/);
+    const pathMatch = content.match(/<path>([\s\S]*?)<\/path>/);
+    if (!queryMatch) {
+      return `Error: grep_search call must include a <query> tag.`;
+    }
+    const query = queryMatch[1];
+    const rawPath = pathMatch ? pathMatch[1].trim() : '.';
+    const searchPath = path.resolve(destDir, rawPath);
+    
+    try {
+      let results = [];
+      function searchDir(dir) {
+        if (!fs.existsSync(dir)) return;
+        const list = fs.readdirSync(dir);
+        for (const item of list) {
+          if (item === 'node_modules' || item === '.git') continue;
+          const full = path.join(dir, item);
+          const stat = fs.statSync(full);
+          if (stat.isDirectory()) {
+            searchDir(full);
+          } else {
+            const fileContent = fs.readFileSync(full, 'utf8');
+            if (fileContent.includes(query)) {
+              const lines = fileContent.split('\n');
+              lines.forEach((line, index) => {
+                if (line.includes(query)) {
+                  results.push(`${path.relative(destDir, full)}:${index + 1}: ${line.trim()}`);
+                }
+              });
+            }
+          }
+        }
+      }
+      searchDir(searchPath);
+      return results.length > 0 
+        ? `Found matches for "${query}" in "${rawPath}":\n${results.slice(0, 50).join('\n')}` 
+        : `No matches found for "${query}" in "${rawPath}".`;
+    } catch (err) {
+      return `Error searching files: ${err.message}`;
+    }
+  }
+
+  return `Error: Unknown tool "${name}"`;
+}
+
+// Autonomous Agent execution loop
+async function runAgent(agentName, initialPrompt) {
+  const destDir = process.cwd();
+  const { systemInstructions, agentInstructions } = loadAgentInstructions(agentName, destDir);
+  const fullSystemPrompt = `${systemInstructions}\n\n=== Agent Persona: ${agentName} ===\n${agentInstructions}\n\n${TOOLS_DEFINITION}`;
+  
+  const messages = [
+    { role: 'user', content: initialPrompt }
+  ];
+
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
+
+  console.log(`\n${colors.cyan}${colors.bright}🤖 Starting Agent Loop for: ${agentName}${colors.reset}`);
+  console.log(`${colors.dim}Using LLM Provider...${colors.reset}\n`);
+
+  let loopCount = 0;
+  const maxLoops = 20;
+
+  try {
+    while (loopCount < maxLoops) {
+      loopCount++;
+      console.log(`\n${colors.cyan}${colors.bright}--- Step ${loopCount} ---${colors.reset}`);
+      
+      const responseText = await callLLM(fullSystemPrompt, messages);
+      
+      console.log(`\n${colors.magenta}${colors.bright}Assistant:${colors.reset}\n${responseText}\n`);
+      
+      messages.push({ role: 'assistant', content: responseText });
+      
+      const toolCallMatch = responseText.match(/<tool_call name="([\s\S]*?)">([\s\S]*?)<\/tool_call>/);
+      
+      if (toolCallMatch) {
+        const toolName = toolCallMatch[1].trim();
+        const toolContent = toolCallMatch[2];
+        
+        const toolResult = await executeTool(toolName, toolContent, rl, destDir);
+        
+        console.log(`\n${colors.green}${colors.bright}🔧 [Tool Output]${colors.reset}\n${toolResult}\n`);
+        
+        messages.push({ 
+          role: 'user', 
+          content: `[Tool Output for ${toolName}]:\n${toolResult}` 
+        });
+      } else {
+        console.log(`\n${colors.green}${colors.bright}✔ Agent finished its execution loop.${colors.reset}\n`);
+        break;
+      }
+    }
+    
+    if (loopCount >= maxLoops) {
+      console.warn(`${colors.yellow}Warning: Agent reached maximum loop iterations (${maxLoops}).${colors.reset}\n`);
+    }
+  } catch (err) {
+    console.error(`\n${colors.red}${colors.bright}Error during execution: ${err.message}${colors.reset}\n`);
+  } finally {
+    rl.close();
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   
@@ -74,35 +454,78 @@ async function main() {
   let force = false;
   let isPostinstall = false;
   let isGlobal = false;
+  let agentName = null;
+  let runPrompt = null;
   
-  // Quick parsing
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    if (arg === '-h' || arg === '--help' || arg === 'help') {
-      showHelp();
-      process.exit(0);
+  if (args[0] === 'run') {
+    command = 'run';
+    let positionalIdx = 1;
+    while (positionalIdx < args.length && args[positionalIdx].startsWith('-')) {
+      positionalIdx++;
     }
-    if (arg === '-v' || arg === '--version' || arg === 'version') {
-      console.log(`v${getVersion()}`);
-      process.exit(0);
+    if (positionalIdx < args.length) {
+      agentName = args[positionalIdx];
+      runPrompt = args.slice(positionalIdx + 1).join(' ');
     }
-    if (arg === '-f' || arg === '--force') {
-      force = true;
-    } else if (arg === '-g' || arg === '--global') {
-      isGlobal = true;
-    } else if (arg === '--postinstall') {
-      isPostinstall = true;
-    } else if (arg === 'init') {
-      command = 'init';
-      // If there is another arg after init, treat it as targetPath
-      if (args[i + 1] && !args[i + 1].startsWith('-')) {
-        targetPath = args[i + 1];
-        i++;
+  } else {
+    // Quick parsing
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === '-h' || arg === '--help' || arg === 'help') {
+        showHelp();
+        process.exit(0);
       }
-    } else if (!arg.startsWith('-')) {
-      // Positional target directory
-      targetPath = arg;
+      if (arg === '-v' || arg === '--version' || arg === 'version') {
+        console.log(`v${getVersion()}`);
+        process.exit(0);
+      }
+      if (arg === '-f' || arg === '--force') {
+        force = true;
+      } else if (arg === '-g' || arg === '--global') {
+        isGlobal = true;
+      } else if (arg === '--postinstall') {
+        isPostinstall = true;
+      } else if (arg === 'init') {
+        command = 'init';
+        // If there is another arg after init, treat it as targetPath
+        if (args[i + 1] && !args[i + 1].startsWith('-')) {
+          targetPath = args[i + 1];
+          i++;
+        }
+      } else if (!arg.startsWith('-')) {
+        // Positional target directory
+        targetPath = arg;
+      }
     }
+  }
+
+  if (command === 'run') {
+    if (!agentName) {
+      console.error(`${colors.red}Error: Please specify the agent name to run.${colors.reset}`);
+      console.log('Usage: npx agent-system run <agent-name> [prompt]');
+      process.exit(1);
+    }
+    
+    if (!runPrompt) {
+      const rlPrompt = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+      });
+      runPrompt = await new Promise((resolve) => {
+        rlPrompt.question(`Enter the task for agent "${agentName}": `, (answer) => {
+          resolve(answer.trim());
+        });
+      });
+      rlPrompt.close();
+      
+      if (!runPrompt) {
+        console.error(`${colors.red}Error: Task prompt cannot be empty.${colors.reset}`);
+        process.exit(1);
+      }
+    }
+    
+    await runAgent(agentName, runPrompt);
+    process.exit(0);
   }
 
   if (command !== 'init') {
@@ -137,8 +560,12 @@ async function main() {
     '.agents',
     '.claude',
     '.codex',
+    '.cursor',
+    '.gemini',
+    '.github',
     'AGENTS.md',
-    'CLAUDE.md'
+    'CLAUDE.md',
+    'GEMINI.md'
   ];
 
   // Resolve list of files to copy
@@ -218,7 +645,8 @@ async function main() {
     const rulesToAppend = [
       '.agent-system/runs/',
       '.agent-system/tmp/',
-      '.claude/settings.local.json'
+      '.claude/settings.local.json',
+      '.gemini/settings.local.json'
     ];
 
     if (!fs.existsSync(gitignorePath)) {
