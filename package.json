@@ -7,6 +7,9 @@
     "agent-system": "bin/cli.js",
     "agent-systems": "bin/cli.js"
   },
+  "scripts": {
+    "postinstall": "node bin/cli.js init --postinstall"
+  },
   "files": [
     "bin",
     ".agent-system",

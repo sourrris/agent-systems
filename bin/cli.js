@@ -4,6 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import readline from 'readline';
+import os from 'os';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
@@ -36,6 +37,7 @@ const showHelp = () => {
   console.log('  version           Show version info\n');
   console.log(`${colors.bright}Options:${colors.reset}`);
   console.log('  -f, --force       Overwrite existing files without prompting');
+  console.log('  -g, --global      Initialize globally in the home directory (system-wide installation)');
   console.log('  -h, --help        Show this help message');
   console.log('  -v, --version     Show version info\n');
 };
@@ -68,8 +70,10 @@ async function main() {
   const args = process.argv.slice(2);
   
   let command = 'init';
-  let targetPath = '.';
+  let targetPath = null;
   let force = false;
+  let isPostinstall = false;
+  let isGlobal = false;
   
   // Quick parsing
   for (let i = 0; i < args.length; i++) {
@@ -84,6 +88,10 @@ async function main() {
     }
     if (arg === '-f' || arg === '--force') {
       force = true;
+    } else if (arg === '-g' || arg === '--global') {
+      isGlobal = true;
+    } else if (arg === '--postinstall') {
+      isPostinstall = true;
     } else if (arg === 'init') {
       command = 'init';
       // If there is another arg after init, treat it as targetPath
@@ -102,7 +110,25 @@ async function main() {
     process.exit(1);
   }
 
+  // Resolve target directory
+  if (isGlobal) {
+    targetPath = os.homedir();
+  } else if (!targetPath) {
+    if (process.env.INIT_CWD) {
+      targetPath = process.env.INIT_CWD;
+    } else {
+      targetPath = '.';
+    }
+  }
+
   const destDir = path.resolve(targetPath);
+
+  // Check if we are running in local development mode during postinstall
+  if (isPostinstall && destDir === packageRoot) {
+    console.log(`${colors.cyan}Local development environment detected. Skipping auto-initialization.${colors.reset}\n`);
+    process.exit(0);
+  }
+
   printBanner();
   console.log(`${colors.dim}Target Workspace:${colors.reset} ${colors.bright}${destDir}${colors.reset}\n`);
 
@@ -185,40 +211,55 @@ async function main() {
     rl.close();
   }
 
-  // Update .gitignore
-  console.log('');
-  const gitignorePath = path.join(destDir, '.gitignore');
-  const rulesToAppend = [
-    '.agent-system/runs/',
-    '.agent-system/tmp/',
-    '.claude/settings.local.json'
-  ];
+  if (!isGlobal) {
+    // Update .gitignore
+    console.log('');
+    const gitignorePath = path.join(destDir, '.gitignore');
+    const rulesToAppend = [
+      '.agent-system/runs/',
+      '.agent-system/tmp/',
+      '.claude/settings.local.json'
+    ];
 
-  if (!fs.existsSync(gitignorePath)) {
-    fs.mkdirSync(path.dirname(gitignorePath), { recursive: true });
-    fs.writeFileSync(gitignorePath, '# Agent system directories\n' + rulesToAppend.join('\n') + '\n');
-    console.log(`${colors.green}[CREATED]${colors.reset} .gitignore with agent-system patterns.`);
-  } else {
-    const content = fs.readFileSync(gitignorePath, 'utf8');
-    const lines = content.split('\n').map(l => l.trim());
-    const missingRules = rulesToAppend.filter(r => !lines.includes(r));
-    
-    if (missingRules.length > 0) {
-      let toAppend = '\n# Agent system directories\n' + missingRules.join('\n') + '\n';
-      fs.appendFileSync(gitignorePath, toAppend);
-      console.log(`${colors.yellow}[UPDATED]${colors.reset} .gitignore: Appended missing agent-system patterns.`);
+    if (!fs.existsSync(gitignorePath)) {
+      fs.mkdirSync(path.dirname(gitignorePath), { recursive: true });
+      fs.writeFileSync(gitignorePath, '# Agent system directories\n' + rulesToAppend.join('\n') + '\n');
+      console.log(`${colors.green}[CREATED]${colors.reset} .gitignore with agent-system patterns.`);
     } else {
-      console.log(`${colors.cyan}${colors.dim}[IDENTICAL]${colors.reset} ${colors.dim}.gitignore already contains agent-system patterns.${colors.reset}`);
+      const content = fs.readFileSync(gitignorePath, 'utf8');
+      const lines = content.split('\n').map(l => l.trim());
+      const missingRules = rulesToAppend.filter(r => !lines.includes(r));
+      
+      if (missingRules.length > 0) {
+        let toAppend = '\n# Agent system directories\n' + missingRules.join('\n') + '\n';
+        fs.appendFileSync(gitignorePath, toAppend);
+        console.log(`${colors.yellow}[UPDATED]${colors.reset} .gitignore: Appended missing agent-system patterns.`);
+      } else {
+        console.log(`${colors.cyan}${colors.dim}[IDENTICAL]${colors.reset} ${colors.dim}.gitignore already contains agent-system patterns.${colors.reset}`);
+      }
     }
   }
 
-  console.log(`\n${colors.green}${colors.bright}✔ Agent system environment successfully initialized!${colors.reset}\n`);
-  console.log(`${colors.bright}Next steps:${colors.reset}`);
-  console.log(`  1. Review and update "${colors.cyan}.agent-system/project/profile.md${colors.reset}" to define your project purpose and commands.`);
-  console.log(`  2. Standardize agent rules inside "${colors.cyan}.claude/${colors.reset}", "${colors.cyan}.agents/${colors.reset}", and "${colors.cyan}.codex/${colors.reset}" as needed.\n`);
+  if (isGlobal) {
+    console.log(`\n${colors.green}${colors.bright}✔ Agent system environment successfully initialized globally!${colors.reset}\n`);
+    console.log(`${colors.bright}Next steps:${colors.reset}`);
+    console.log(`  1. Review and update global configurations inside "${colors.cyan}~/.agent-system/project/profile.md${colors.reset}".`);
+    console.log(`  2. Your custom agents and rules are now available system-wide in Claude Code and Codex.\n`);
+  } else {
+    console.log(`\n${colors.green}${colors.bright}✔ Agent system environment successfully initialized!${colors.reset}\n`);
+    console.log(`${colors.bright}Next steps:${colors.reset}`);
+    console.log(`  1. Review and update "${colors.cyan}.agent-system/project/profile.md${colors.reset}" to define your project purpose and commands.`);
+    console.log(`  2. Standardize agent rules inside "${colors.cyan}.claude/${colors.reset}", "${colors.cyan}.agents/${colors.reset}", and "${colors.cyan}.codex/${colors.reset}" as needed.\n`);
+  }
 }
 
 main().catch((err) => {
   console.error(`${colors.red}Error: ${err.message}${colors.reset}`);
+  const args = process.argv.slice(2);
+  const isPostinstall = args.includes('--postinstall');
+  if (isPostinstall) {
+    console.log(`${colors.yellow}Postinstall warning: Initialization failed but exiting cleanly to not block package install.${colors.reset}`);
+    process.exit(0);
+  }
   process.exit(1);
 });
