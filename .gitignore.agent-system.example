@@ -1,0 +1,4 @@
+# Merge these into your repository .gitignore if desired.
+.agent-system/runs/
+.agent-system/tmp/
+.claude/settings.local.json

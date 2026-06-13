@@ -1,0 +1,4 @@
+sqlalchemy
+click
+pydantic
+pytest

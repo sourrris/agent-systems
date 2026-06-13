@@ -1,0 +1,5 @@
+{
+  "promotion_mode": "manual",
+  "minimum_eval_cases_for_auto_promotion": 3,
+  "maximum_candidates_per_run": 1
+}
