@@ -1,6 +1,6 @@
 # Agent Systems
 
-Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, and **GitHub Copilot**.
+Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, **OpenCode**, and **GitHub Copilot**.
 
 [![NPM Version](https://img.shields.io/npm/v/agent-systems?style=flat&color=007ACC)](https://www.npmjs.com/package/agent-systems)
 [![License](https://img.shields.io/github/license/sourrris/agent-systems?style=flat&color=708090)](LICENSE)
@@ -44,7 +44,7 @@ npx agent-systems run doitforme "Optimize the database schema"
 
 ## 🎯 Key Features
 
-*   **🌐 Cross-Platform Standards**: Uniform profiles and configurations for **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, and **GitHub Copilot**.
+*   **🌐 Cross-Platform Standards**: Uniform profiles and configurations for **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, **OpenCode**, and **GitHub Copilot**.
 *   **🔒 Strict Security Guardrails**: Built-in rules that prevent AI agents from reading, printing, copying, or committing `.env` files, PEM keys, and access tokens.
 *   **🧬 Multi-Agent Orchestration**: Standardizes distinct agent persona roles (`investigator`, `planner`, `implementer`, `reviewer`, `verifier`, `skill-librarian`) to handle complex workflows safely.
 *   **🛡️ Prompt Injection Resistance**: Instructs agents to treat external text, issues, and logs strictly as data rather than executable instructions.
@@ -92,9 +92,13 @@ your-project/
 │   └── settings.json               # Security file exclusions
 ├── .github/                     # GitHub Copilot configurations
 │   └── copilot-instructions.md     # Repository-wide Copilot instructions
+├── .opencode/                   # OpenCode configurations
+│   └── agents/                     # Persona prompts (investigator, planner, etc.)
 ├── AGENTS.md                    # Root instructions for Cursor / Codex / generic agents
 ├── CLAUDE.md                    # Root instructions for Claude Code
-└── GEMINI.md                    # Root instructions for Gemini CLI / Antigravity
+├── GEMINI.md                    # Root instructions for Gemini CLI / Antigravity
+├── OPENCODE.md                  # Root instructions for OpenCode
+└── opencode.json                # Project-level configuration for OpenCode
 ```
 
 ---

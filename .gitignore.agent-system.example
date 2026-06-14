@@ -2,3 +2,5 @@
 .agent-system/runs/
 .agent-system/tmp/
 .claude/settings.local.json
+.gemini/settings.local.json
+opencode.local.json

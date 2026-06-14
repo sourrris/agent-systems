@@ -204,8 +204,10 @@ function loadAgentInstructions(agentName, destDir) {
   const agentPaths = [
     path.join(destDir, '.claude', 'agents', `${agentName}.md`),
     path.join(destDir, '.codex', 'agents', `${agentName}.toml`),
+    path.join(destDir, '.opencode', 'agents', `${agentName}.md`),
     path.join(os.homedir(), '.claude', 'agents', `${agentName}.md`),
-    path.join(os.homedir(), '.codex', 'agents', `${agentName}.toml`)
+    path.join(os.homedir(), '.codex', 'agents', `${agentName}.toml`),
+    path.join(os.homedir(), '.opencode', 'agents', `${agentName}.md`)
   ];
 
   let agentInstructions = '';
@@ -563,9 +565,12 @@ async function main() {
     '.cursor',
     '.gemini',
     '.github',
+    '.opencode',
     'AGENTS.md',
     'CLAUDE.md',
-    'GEMINI.md'
+    'GEMINI.md',
+    'OPENCODE.md',
+    'opencode.json'
   ];
 
   // Resolve list of files to copy
@@ -646,7 +651,8 @@ async function main() {
       '.agent-system/runs/',
       '.agent-system/tmp/',
       '.claude/settings.local.json',
-      '.gemini/settings.local.json'
+      '.gemini/settings.local.json',
+      'opencode.local.json'
     ];
 
     if (!fs.existsSync(gitignorePath)) {

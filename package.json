@@ -1,7 +1,7 @@
 {
   "name": "agent-systems",
   "version": "1.1.1",
-  "description": "Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for Cursor, Claude Code, Codex, Gemini / Antigravity, and GitHub Copilot.",
+  "description": "Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for Cursor, Claude Code, Codex, Gemini / Antigravity, OpenCode, and GitHub Copilot.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/sourrris/agent-systems.git"
@@ -27,9 +27,12 @@
     ".cursor",
     ".gemini",
     ".github",
+    ".opencode",
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",
+    "OPENCODE.md",
+    "opencode.json",
     ".gitignore.agent-system.example"
   ],
   "engines": {
@@ -43,6 +46,7 @@
     "antigravity",
     "gemini",
     "copilot",
+    "opencode",
     "standards",
     "cli"
   ],

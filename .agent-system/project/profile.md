@@ -37,8 +37,12 @@ node bin/cli.js --help
   - `.agents/`
   - `.claude/`
   - `.codex/`
+  - `.opencode/`
   - `AGENTS.md`
   - `CLAUDE.md`
+  - `GEMINI.md`
+  - `OPENCODE.md`
+  - `opencode.json`
 - Public CLI compatibility must be maintained for arguments (`init [path]`, `-f`, `--force`, `-h`, `--help`, `-v`, `--version`).
 
 ## Coding conventions
