@@ -15,7 +15,7 @@ Standardized environment profiles, operating protocols, security policies, and m
 Initialize standard configuration profiles, markdown rules, and environment constraints explicitly:
 
 ```bash
-npx --registry=https://npm.pkg.github.com @sourrris/agent-systems init
+npx agent-systems init
 ```
 
 Installing the package does not write files into your repository. Running `init`
@@ -28,17 +28,17 @@ with safe defaults.
 
 ```bash
 # Accepted for compatibility; existing files are still preserved
-npx --registry=https://npm.pkg.github.com @sourrris/agent-systems init --force
+npx agent-systems init --force
 
 # Initialize in a specific subdirectory
-npx --registry=https://npm.pkg.github.com @sourrris/agent-systems init ./my-project-dir
+npx agent-systems init ./my-project-dir
 
 # View full usage instructions
-npx --registry=https://npm.pkg.github.com @sourrris/agent-systems --help
+npx agent-systems --help
 
 # Run a custom agent in the current workspace (requires GEMINI_API_KEY or ANTHROPIC_API_KEY)
 export GEMINI_API_KEY="your-api-key"
-npx --registry=https://npm.pkg.github.com @sourrris/agent-systems run doitforme "Optimize the database schema"
+npx agent-systems run doitforme "Optimize the database schema"
 ```
 
 If you link the package locally during development, use the binary aliases:

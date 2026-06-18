@@ -1,9 +1,9 @@
 {
-  "name": "@sourrris/agent-systems",
+  "name": "agent-systems",
   "version": "1.2.1",
   "description": "Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for Cursor, Claude Code, Codex, Gemini / Antigravity, OpenCode, and GitHub Copilot.",
   "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
+    "registry": "https://registry.npmjs.org"
   },
   "repository": {
     "type": "git",
