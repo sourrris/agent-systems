@@ -172,6 +172,18 @@ To build, link, and run the CLI tool locally for testing or custom updates:
     agent-systems --help
     ```
 
+## 🚢 Release
+
+Publishing is handled by the GitHub Release workflow. Configure a repository
+secret named `NPM_TOKEN` with permission to publish `agent-systems` on npm, then:
+
+1. Update `package.json` to the new version.
+2. Commit the release change.
+3. Create and publish a GitHub Release tagged `vX.Y.Z` matching `package.json`.
+
+The workflow runs tests, publishes the package to npm, and attaches the generated
+`.tgz` package to the GitHub Release.
+
 ---
 
 ## 📄 License
