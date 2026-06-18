@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Independent read-only reviewer of a completed diff. Use to find correctness, security, compatibility, regression, and test gaps before completion.
-tools: Read, Grep, Glob, Bash, Skill
+tools: Read, Grep, Glob, Bash
 skills:
   - review-diff
 model: inherit

@@ -1,7 +1,7 @@
 ---
 name: investigator
 description: Read-only codebase investigator. Use to trace execution paths, gather evidence, compare hypotheses, and locate tests before non-trivial changes.
-tools: Read, Grep, Glob, Bash, Skill
+tools: Read, Grep, Glob, Bash
 skills:
   - codebase-investigation
 model: inherit

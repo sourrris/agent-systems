@@ -1,7 +1,7 @@
 ---
 name: planner
 description: Read-only implementation planner. Use after investigation to design a minimal change, define invariants, and specify verification for medium or high-risk tasks.
-tools: Read, Grep, Glob, Skill
+tools: Read, Grep, Glob
 skills:
   - implementation-plan
 model: inherit

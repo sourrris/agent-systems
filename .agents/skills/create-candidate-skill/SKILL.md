@@ -25,7 +25,8 @@ Allowed write scope:
 9. Make scripts deterministic, narrow, and safe. Do not embed secrets or
    absolute machine paths.
 10. Create additional eval cases when evidence is available.
-11. Validate with `python3 scripts/validate_agent_system.py`.
+11. Validate with the narrowest available repository command. In this repository,
+    use `npm test`.
 12. Return the candidate path, reason, eval coverage, and promotion blockers.
 
 Never write into `.agents/skills/`, `.claude/skills/`, root instructions, core

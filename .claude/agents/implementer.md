@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Implementation owner for an already investigated and planned coding task. Use for focused edits and tests; do not use as the final reviewer.
-tools: Read, Grep, Glob, Bash, Edit, Write, Skill
+tools: Read, Grep, Glob, Bash, Edit, Write
 skills:
   - implement-change
 model: inherit

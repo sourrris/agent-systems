@@ -1,6 +1,7 @@
 # Repository specific files to ignore
 .agent-system/runs/
 .agent-system/tmp/
+.agent-system/updates/
 .claude/settings.local.json
 .gemini/settings.local.json
 opencode.local.json

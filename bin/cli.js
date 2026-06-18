@@ -11,6 +11,43 @@ import { exec } from 'child_process';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageRoot = path.resolve(__dirname, '..');
 
+const LOCAL_ONLY_PATH_PATTERNS = [
+  /(^|\/)\.DS_Store$/,
+  /(^|\/)[^/]*\.local\.json$/,
+  /(^|\/)\.agent-system\/(runs|tmp|updates)(\/|$)/,
+  /(^|\/)\.opencode\/\.gitignore$/,
+  /(^|\/)[^/]*\.(log|tmp)$/
+];
+
+const UPDATE_PROPOSAL_DIR = '.agent-system/updates';
+const PROJECT_PROFILE_PATH = '.agent-system/project/profile.md';
+
+const MERGEABLE_JSON_FILES = new Set([
+  '.claude/settings.json',
+  '.gemini/settings.json',
+  'opencode.json'
+]);
+
+const MERGEABLE_MARKDOWN_FILES = new Set([
+  'AGENTS.md',
+  'CLAUDE.md',
+  'GEMINI.md',
+  'OPENCODE.md',
+  '.github/copilot-instructions.md'
+]);
+
+const PROTECTED_PATH_PATTERNS = [
+  /(^|\/)\.env($|\.)/,
+  /(^|\/)secrets(\/|$)/,
+  /(^|\/)credentials(\/|$)/,
+  /(^|\/)[^/]*\.pem$/,
+  /(^|\/)[^/]*\.key$/,
+  /(^|\/)node_modules(\/|$)/,
+  /(^|\/)dist(\/|$)/,
+  /(^|\/)build(\/|$)/,
+  /(^|\/)vendor(\/|$)/
+];
+
 // Colors helper
 const colors = {
   reset: '\x1b[0m',
@@ -39,7 +76,7 @@ const showHelp = () => {
   console.log('  help              Show this help message');
   console.log('  version           Show version info\n');
   console.log(`${colors.bright}Options:${colors.reset}`);
-  console.log('  -f, --force       Overwrite existing files without prompting');
+  console.log('  -f, --force       Accepted for compatibility; existing files are not overwritten');
   console.log('  -g, --global      Initialize globally in the home directory (system-wide installation)');
   console.log('  -h, --help        Show this help message');
   console.log('  -v, --version     Show version info\n');
@@ -67,6 +104,225 @@ function getAllFiles(dir, baseDir = dir) {
     }
   }
   return files;
+}
+
+function normalizeRelPath(relPath) {
+  return relPath.split(path.sep).join('/').replace(/\\/g, '/');
+}
+
+function shouldCopyTemplate(relPath) {
+  const normalized = normalizeRelPath(relPath);
+  if (normalized === PROJECT_PROFILE_PATH) {
+    return false;
+  }
+  return !LOCAL_ONLY_PATH_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
+function isInsideDir(baseDir, targetPath) {
+  const relative = path.relative(baseDir, targetPath);
+  return relative === '' || (!!relative && !relative.startsWith('..') && !path.isAbsolute(relative));
+}
+
+function isProtectedRelPath(relPath) {
+  const normalized = normalizeRelPath(relPath).replace(/^\.?\//, '');
+  return PROTECTED_PATH_PATTERNS.some(pattern => pattern.test(normalized));
+}
+
+function resolveWorkspacePath(destDir, rawPath) {
+  const resolvedPath = path.resolve(destDir, rawPath || '.');
+  if (!isInsideDir(destDir, resolvedPath)) {
+    throw new Error(`Path escapes the workspace: ${rawPath}`);
+  }
+
+  const relativePath = normalizeRelPath(path.relative(destDir, resolvedPath));
+  if (relativePath && isProtectedRelPath(relativePath)) {
+    throw new Error(`Protected path cannot be accessed: ${rawPath}`);
+  }
+
+  return resolvedPath;
+}
+
+function mergeJsonValue(existingValue, templateValue) {
+  if (Array.isArray(existingValue) && Array.isArray(templateValue)) {
+    const merged = [...existingValue];
+    for (const item of templateValue) {
+      if (!merged.some(existingItem => JSON.stringify(existingItem) === JSON.stringify(item))) {
+        merged.push(item);
+      }
+    }
+    return merged;
+  }
+
+  if (
+    existingValue &&
+    templateValue &&
+    typeof existingValue === 'object' &&
+    typeof templateValue === 'object' &&
+    !Array.isArray(existingValue) &&
+    !Array.isArray(templateValue)
+  ) {
+    const merged = { ...existingValue };
+    for (const [key, value] of Object.entries(templateValue)) {
+      merged[key] = key in merged ? mergeJsonValue(merged[key], value) : value;
+    }
+    return merged;
+  }
+
+  return existingValue === undefined ? templateValue : existingValue;
+}
+
+function mergeJsonFile(srcFile, destFile) {
+  const existingJson = JSON.parse(fs.readFileSync(destFile, 'utf8'));
+  const templateJson = JSON.parse(fs.readFileSync(srcFile, 'utf8'));
+  const mergedJson = mergeJsonValue(existingJson, templateJson);
+  const mergedContent = `${JSON.stringify(mergedJson, null, 2)}\n`;
+  const currentContent = fs.readFileSync(destFile, 'utf8');
+
+  if (currentContent === mergedContent) {
+    return false;
+  }
+
+  fs.writeFileSync(destFile, mergedContent, 'utf8');
+  return true;
+}
+
+function defaultProjectProfile() {
+  return `# Project Profile
+
+This profile should be customized for this repository.
+
+## Repository purpose
+
+TODO: Describe what this repository builds or maintains.
+
+## Technology
+
+- Primary languages: TODO
+- Frameworks: TODO
+- Package manager: TODO
+- Runtime versions: TODO
+- Database and infrastructure: TODO
+
+## Commands
+
+Use exact commands.
+
+\`\`\`bash
+# Install dependencies
+TODO
+
+# Run tests
+TODO
+
+# Run lint/type checks
+TODO
+\`\`\`
+
+## Architecture boundaries
+
+- TODO: List important source, test, generated, and configuration boundaries.
+
+## Coding conventions
+
+- Inspect existing patterns before changing code.
+- Keep patches small and focused.
+- Preserve unrelated user changes.
+
+## Protected and sensitive paths
+
+Never inspect or expose secrets. Avoid editing generated or vendored content.
+
+\`\`\`text
+.env
+.env.*
+secrets/
+credentials/
+**/*.pem
+**/*.key
+node_modules/
+dist/
+build/
+vendor/
+\`\`\`
+
+## Risk classification overrides
+
+Always classify these as high risk:
+
+- TODO: Add repository-specific high-risk areas.
+
+## Definition of done
+
+A change is complete only when:
+
+1. acceptance criteria are satisfied;
+2. the narrowest useful checks pass;
+3. no unrelated changes were introduced;
+4. remaining uncertainty is reported honestly.
+`;
+}
+
+function writeTemplateFile(relPath, srcFile, destFile) {
+  fs.mkdirSync(path.dirname(destFile), { recursive: true });
+  fs.copyFileSync(srcFile, destFile);
+}
+
+function ensureProjectProfile(destDir) {
+  const profilePath = path.join(destDir, PROJECT_PROFILE_PATH);
+  if (fs.existsSync(profilePath)) {
+    return false;
+  }
+
+  fs.mkdirSync(path.dirname(profilePath), { recursive: true });
+  fs.writeFileSync(profilePath, defaultProjectProfile(), 'utf8');
+  return true;
+}
+
+function mergeMarkdownFile(relPath, srcFile, destFile) {
+  const startMarker = `<!-- agent-systems:${relPath}:start -->`;
+  const endMarker = `<!-- agent-systems:${relPath}:end -->`;
+  const templateContent = fs.readFileSync(srcFile, 'utf8').trim();
+  const managedBlock = `${startMarker}\n${templateContent}\n${endMarker}`;
+  const existingContent = fs.readFileSync(destFile, 'utf8');
+
+  let mergedContent;
+  const startIndex = existingContent.indexOf(startMarker);
+  const endIndex = existingContent.indexOf(endMarker);
+
+  if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+    mergedContent =
+      existingContent.slice(0, startIndex) +
+      managedBlock +
+      existingContent.slice(endIndex + endMarker.length);
+  } else if (existingContent.includes(templateContent)) {
+    return false;
+  } else {
+    return null;
+  }
+
+  if (existingContent === mergedContent) {
+    return false;
+  }
+
+  fs.writeFileSync(destFile, mergedContent, 'utf8');
+  return true;
+}
+
+function writeUpdateProposal(destDir, relPath, srcFile) {
+  const proposalRelPath = normalizeRelPath(path.join(UPDATE_PROPOSAL_DIR, relPath));
+  const proposalFile = path.join(destDir, proposalRelPath);
+  const content =
+    normalizeRelPath(relPath) === PROJECT_PROFILE_PATH
+      ? Buffer.from(defaultProjectProfile(), 'utf8')
+      : fs.readFileSync(srcFile);
+
+  if (fs.existsSync(proposalFile) && fs.readFileSync(proposalFile).equals(content)) {
+    return { relPath: proposalRelPath, changed: false };
+  }
+
+  fs.mkdirSync(path.dirname(proposalFile), { recursive: true });
+  fs.writeFileSync(proposalFile, content);
+  return { relPath: proposalRelPath, changed: true };
 }
 
 // HTTP request helper using native https module
@@ -267,11 +523,11 @@ async function executeTool(name, content, rl, destDir) {
   
   if (name === 'read_file') {
     const rawPath = content.trim();
-    const filePath = path.resolve(destDir, rawPath);
-    if (!fs.existsSync(filePath)) {
-      return `Error: File does not exist at ${rawPath}`;
-    }
     try {
+      const filePath = resolveWorkspacePath(destDir, rawPath);
+      if (!fs.existsSync(filePath)) {
+        return `Error: File does not exist at ${rawPath}`;
+      }
       const data = fs.readFileSync(filePath, 'utf8');
       return `File ${rawPath} read successfully:\n${data}`;
     } catch (err) {
@@ -287,7 +543,12 @@ async function executeTool(name, content, rl, destDir) {
     }
     const rawPath = pathMatch[1].trim();
     const fileContent = contentMatch[1];
-    const filePath = path.resolve(destDir, rawPath);
+    let filePath;
+    try {
+      filePath = resolveWorkspacePath(destDir, rawPath);
+    } catch (err) {
+      return `Error writing file: ${err.message}`;
+    }
 
     const approved = await askConfirmation(rl, `Approve writing/updating file "${rawPath}"?`);
     if (!approved) {
@@ -323,11 +584,11 @@ async function executeTool(name, content, rl, destDir) {
 
   if (name === 'list_dir') {
     const rawPath = content.trim() || '.';
-    const dirPath = path.resolve(destDir, rawPath);
-    if (!fs.existsSync(dirPath)) {
-      return `Error: Directory does not exist at ${rawPath}`;
-    }
     try {
+      const dirPath = resolveWorkspacePath(destDir, rawPath);
+      if (!fs.existsSync(dirPath)) {
+        return `Error: Directory does not exist at ${rawPath}`;
+      }
       const items = fs.readdirSync(dirPath);
       const list = items.map(item => {
         const full = path.join(dirPath, item);
@@ -348,9 +609,9 @@ async function executeTool(name, content, rl, destDir) {
     }
     const query = queryMatch[1];
     const rawPath = pathMatch ? pathMatch[1].trim() : '.';
-    const searchPath = path.resolve(destDir, rawPath);
     
     try {
+      const searchPath = resolveWorkspacePath(destDir, rawPath);
       let results = [];
       function searchDir(dir) {
         if (!fs.existsSync(dir)) return;
@@ -358,6 +619,8 @@ async function executeTool(name, content, rl, destDir) {
         for (const item of list) {
           if (item === 'node_modules' || item === '.git') continue;
           const full = path.join(dir, item);
+          const relativePath = normalizeRelPath(path.relative(destDir, full));
+          if (isProtectedRelPath(relativePath)) continue;
           const stat = fs.statSync(full);
           if (stat.isDirectory()) {
             searchDir(full);
@@ -453,8 +716,6 @@ async function main() {
   
   let command = 'init';
   let targetPath = null;
-  let force = false;
-  let isPostinstall = false;
   let isGlobal = false;
   let agentName = null;
   let runPrompt = null;
@@ -482,11 +743,9 @@ async function main() {
         process.exit(0);
       }
       if (arg === '-f' || arg === '--force') {
-        force = true;
+        // Kept for CLI compatibility. Existing files are preserved.
       } else if (arg === '-g' || arg === '--global') {
         isGlobal = true;
-      } else if (arg === '--postinstall') {
-        isPostinstall = true;
       } else if (arg === 'init') {
         command = 'init';
         // If there is another arg after init, treat it as targetPath
@@ -548,12 +807,6 @@ async function main() {
 
   const destDir = path.resolve(targetPath);
 
-  // Check if we are running in local development mode during postinstall
-  if (isPostinstall && destDir === packageRoot) {
-    console.log(`${colors.cyan}Local development environment detected. Skipping auto-initialization.${colors.reset}\n`);
-    process.exit(0);
-  }
-
   printBanner();
   console.log(`${colors.dim}Target Workspace:${colors.reset} ${colors.bright}${destDir}${colors.reset}\n`);
 
@@ -583,43 +836,27 @@ async function main() {
     if (stat.isDirectory()) {
       const children = getAllFiles(srcPath);
       for (const child of children) {
-        filesToCopy.push(path.join(item, child));
+        const relPath = path.join(item, child);
+        if (shouldCopyTemplate(relPath)) {
+          filesToCopy.push(relPath);
+        }
       }
     } else {
-      filesToCopy.push(item);
+      if (shouldCopyTemplate(item)) {
+        filesToCopy.push(item);
+      }
     }
   }
-
-  const isInteractive = process.stdout.isTTY && process.stdin.isTTY;
-  let rl;
-  
-  const askOverwrite = async (file) => {
-    if (force) return true;
-    if (!isInteractive) return false;
-    
-    if (!rl) {
-      rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-      });
-    }
-    
-    return new Promise((resolve) => {
-      rl.question(`${colors.yellow}Conflict:${colors.reset} "${file}" already exists and has modifications. Overwrite? (y/N): `, (answer) => {
-        resolve(answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes');
-      });
-    });
-  };
 
   // Copy files
   for (const relPath of filesToCopy) {
     const srcFile = path.join(packageRoot, relPath);
     const destFile = path.join(destDir, relPath);
+    const normalizedRelPath = normalizeRelPath(relPath);
     
     if (!fs.existsSync(destFile)) {
       // Create directories if necessary
-      fs.mkdirSync(path.dirname(destFile), { recursive: true });
-      fs.copyFileSync(srcFile, destFile);
+      writeTemplateFile(normalizedRelPath, srcFile, destFile);
       console.log(`${colors.green}[CREATED]${colors.reset} ${relPath}`);
     } else {
       const srcBuf = fs.readFileSync(srcFile);
@@ -628,19 +865,33 @@ async function main() {
       if (srcBuf.equals(destBuf)) {
         console.log(`${colors.cyan}${colors.dim}[IDENTICAL]${colors.reset} ${colors.dim}${relPath}${colors.reset}`);
       } else {
-        const overwrite = await askOverwrite(relPath);
-        if (overwrite) {
-          fs.copyFileSync(srcFile, destFile);
-          console.log(`${colors.yellow}[OVERWRITTEN]${colors.reset} ${relPath}`);
-        } else {
-          console.log(`${colors.red}[SKIPPED]${colors.reset} ${relPath}`);
+        if (MERGEABLE_JSON_FILES.has(normalizedRelPath)) {
+          try {
+            const changed = mergeJsonFile(srcFile, destFile);
+            console.log(`${colors.yellow}${changed ? '[MERGED]' : '[IDENTICAL]'}${colors.reset} ${relPath}`);
+            continue;
+          } catch (err) {
+            console.log(`${colors.yellow}[MERGE FAILED]${colors.reset} ${relPath}: ${err.message}`);
+          }
         }
+
+        if (MERGEABLE_MARKDOWN_FILES.has(normalizedRelPath)) {
+          const changed = mergeMarkdownFile(normalizedRelPath, srcFile, destFile);
+          if (changed !== null) {
+            console.log(`${colors.yellow}${changed ? '[MERGED]' : '[IDENTICAL]'}${colors.reset} ${relPath}`);
+            continue;
+          }
+        }
+
+        const proposal = writeUpdateProposal(destDir, normalizedRelPath, srcFile);
+        const status = proposal.changed ? '[PROPOSED]' : '[PROPOSAL IDENTICAL]';
+        console.log(`${colors.yellow}${status}${colors.reset} ${relPath} -> ${proposal.relPath}`);
       }
     }
   }
 
-  if (rl) {
-    rl.close();
+  if (ensureProjectProfile(destDir)) {
+    console.log(`${colors.green}[CREATED]${colors.reset} ${PROJECT_PROFILE_PATH}`);
   }
 
   if (!isGlobal) {
@@ -650,6 +901,7 @@ async function main() {
     const rulesToAppend = [
       '.agent-system/runs/',
       '.agent-system/tmp/',
+      '.agent-system/updates/',
       '.claude/settings.local.json',
       '.gemini/settings.local.json',
       'opencode.local.json'
@@ -689,11 +941,5 @@ async function main() {
 
 main().catch((err) => {
   console.error(`${colors.red}Error: ${err.message}${colors.reset}`);
-  const args = process.argv.slice(2);
-  const isPostinstall = args.includes('--postinstall');
-  if (isPostinstall) {
-    console.log(`${colors.yellow}Postinstall warning: Initialization failed but exiting cleanly to not block package install.${colors.reset}`);
-    process.exit(0);
-  }
   process.exit(1);
 });

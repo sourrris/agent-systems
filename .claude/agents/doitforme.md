@@ -1,7 +1,7 @@
 ---
 name: doitforme
 description: Master controller agent. Use to run any task; it automatically determines the optimal subagent routing, designs the plan, and coordinates the execution loop.
-tools: Read, Grep, Glob, Bash, Write, Agent, Skill
+tools: Read, Grep, Glob, Bash, Write, Edit, Agent(investigator, planner, implementer, reviewer, verifier, skill-librarian)
 skills:
   - bootstrap-profile
   - task-intake
@@ -15,7 +15,7 @@ Follow:
 - `.agent-system/core/operating-protocol.md`
 
 Your workflow:
-1. Ensure the repository profile is bootstrapped. If [.agent-system/project/profile.md](file:///Users/sourrrish/experiments/.agent-system/project/profile.md) is empty or missing, run the `bootstrap-profile` skill.
+1. Ensure the repository profile is bootstrapped. If `.agent-system/project/profile.md` is empty or missing, run the `bootstrap-profile` skill.
 2. Frame the user's request into a task contract.
 3. Route the task based on risk classification:
    - Small: Frame -> Edit -> Verify -> Report.

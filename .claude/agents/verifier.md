@@ -1,7 +1,7 @@
 ---
 name: verifier
 description: Independent verifier that runs targeted tests, checks, and runtime validation after implementation. Use before claiming completion.
-tools: Read, Grep, Glob, Bash, Skill
+tools: Read, Grep, Glob, Bash
 skills:
   - verify-change
 model: inherit

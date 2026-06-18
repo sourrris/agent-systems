@@ -1,6 +1,6 @@
 {
   "name": "@sourrris/agent-systems",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for Cursor, Claude Code, Codex, Gemini / Antigravity, OpenCode, and GitHub Copilot.",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
@@ -19,18 +19,26 @@
     "agent-systems": "bin/cli.js"
   },
   "scripts": {
-    "postinstall": "node bin/cli.js init --postinstall"
+    "test": "node --check bin/cli.js && node scripts/validate_agent_system.js"
   },
   "files": [
     "bin",
-    ".agent-system",
+    "scripts",
+    ".agent-system/candidates",
+    ".agent-system/contracts",
+    ".agent-system/core",
+    ".agent-system/evals",
+    ".agent-system/memory",
+    ".agent-system/project/improvement-settings.json",
     ".agents",
-    ".claude",
+    ".claude/agents",
+    ".claude/skills",
+    ".claude/settings.json",
     ".codex",
     ".cursor",
     ".gemini",
     ".github",
-    ".opencode",
+    ".opencode/agents",
     "AGENTS.md",
     "CLAUDE.md",
     "GEMINI.md",

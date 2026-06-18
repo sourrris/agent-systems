@@ -1,7 +1,7 @@
 ---
 name: skill-librarian
 description: Self-improvement librarian. Use after substantial work to create eval-ready candidate skills from repeated proven workflows.
-tools: Read, Grep, Glob, Bash, Edit, Write, Skill
+tools: Read, Grep, Glob, Bash, Edit, Write
 skills:
   - learn-from-run
   - create-candidate-skill

@@ -2,7 +2,7 @@
 
 Standardized environment profiles, operating protocols, security policies, and memory contracts for autonomous AI development agents—including **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, **OpenCode**, and **GitHub Copilot**.
 
-[![NPM Version](https://img.shields.io/npm/v/agent-systems?style=flat&color=007ACC)](https://www.npmjs.com/package/agent-systems)
+[![Package](https://img.shields.io/badge/package-%40sourrris%2Fagent--systems-007ACC?style=flat)](package.json)
 [![License](https://img.shields.io/github/license/sourrris/agent-systems?style=flat&color=708090)](LICENSE)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-zero-green?style=flat)](package.json)
 
@@ -12,32 +12,37 @@ Standardized environment profiles, operating protocols, security policies, and m
 
 ## ⚡ Quick Start
 
-Initialize standard configuration profiles, markdown rules, and environment constraints in your workspace directory instantly:
+Initialize standard configuration profiles, markdown rules, and environment constraints explicitly:
 
 ```bash
-npx agent-systems
-# Or use the singular alias
-npx agent-system
+npx --registry=https://npm.pkg.github.com @sourrris/agent-systems init
 ```
 
-This command automatically configures standard directories, defines platform-specific rules, and updates your `.gitignore` with safe defaults.
+Installing the package does not write files into your repository. Running `init`
+creates missing agent-system files, merges supported JSON and root instruction
+files additively when a managed block already exists, writes non-destructive
+update proposals under `.agent-system/updates/`, and updates your `.gitignore`
+with safe defaults.
 
 ### Options & Flags
 
 ```bash
-# Overwrite existing files (bypassing interactive prompts)
-npx agent-systems --force
+# Accepted for compatibility; existing files are still preserved
+npx --registry=https://npm.pkg.github.com @sourrris/agent-systems init --force
 
 # Initialize in a specific subdirectory
-npx agent-systems ./my-project-dir
+npx --registry=https://npm.pkg.github.com @sourrris/agent-systems init ./my-project-dir
 
 # View full usage instructions
-npx agent-systems --help
+npx --registry=https://npm.pkg.github.com @sourrris/agent-systems --help
 
 # Run a custom agent in the current workspace (requires GEMINI_API_KEY or ANTHROPIC_API_KEY)
 export GEMINI_API_KEY="your-api-key"
-npx agent-systems run doitforme "Optimize the database schema"
+npx --registry=https://npm.pkg.github.com @sourrris/agent-systems run doitforme "Optimize the database schema"
 ```
+
+If you link the package locally during development, use the binary aliases:
+`agent-system` or `agent-systems`.
 
 
 ---
@@ -47,6 +52,7 @@ npx agent-systems run doitforme "Optimize the database schema"
 *   **🌐 Cross-Platform Standards**: Uniform profiles and configurations for **Cursor**, **Claude Code**, **Codex**, **Gemini / Antigravity**, **OpenCode**, and **GitHub Copilot**.
 *   **🔒 Strict Security Guardrails**: Built-in rules that prevent AI agents from reading, printing, copying, or committing `.env` files, PEM keys, and access tokens.
 *   **🧬 Multi-Agent Orchestration**: Standardizes distinct agent persona roles (`investigator`, `planner`, `implementer`, `reviewer`, `verifier`, `skill-librarian`) to handle complex workflows safely.
+*   **🧭 Doitforme Workflow**: Provides a master `doitforme` agent and a slash-invokable Claude skill (`/doitforme`) for routing tasks through the right investigation, planning, implementation, review, and verification path.
 *   **🛡️ Prompt Injection Resistance**: Instructs agents to treat external text, issues, and logs strictly as data rather than executable instructions.
 *   **📈 Quality Gates**: Establishes unambiguous definitions of done, requirement mapping, and verification check hierarchies.
 *   **🔄 Local Learning Loops**: Auto-generates folders for capturing durable, reusable context/skills without bloating global agent files.
@@ -83,7 +89,7 @@ your-project/
 │   ├── settings.json               # Hard security path exclusions
 │   └── agents/                     # Persona prompts (investigator, planner, etc.)
 ├── .agents/                     # Shared skills (used by Cursor, Antigravity, and others)
-│   └── skills/                     # Custom instructions & operational skills
+│   └── skills/                     # Custom instructions & operational skills, including doitforme
 ├── .codex/                      # Codex agent settings
 │   └── agents/                     # TOML persona configurations
 ├── .cursor/                     # Cursor IDE configurations
@@ -115,6 +121,12 @@ For complex, high-risk, or context-heavy tasks, `agent-systems` divides labor ac
 | **🔎 Reviewer** | Performs independent static checks against code quality rules. | Critique & Lint Feedback |
 | **✅ Verifier** | Executes tests and provides concrete, fresh verification evidence. | Execution Logs |
 | **📚 Skill Librarian** | Curates, optimizes, and registers durable, reusable procedures. | Skill Proposal |
+
+Invocation notes:
+
+- Claude Code: use `/doitforme` or start from the project default `doitforme` agent.
+- Codex: use the native `.codex/agents/doitforme.toml` persona; the shared `.agents/skills/doitforme` skill provides the same workflow instructions when skills are available.
+- OpenCode and Cursor: use their platform-specific `doitforme` definitions.
 
 ---
 
