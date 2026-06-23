@@ -44,6 +44,24 @@ npx agent-systems run doitforme "Optimize the database schema"
 If you link the package locally during development, use the binary aliases:
 `agent-system` or `agent-systems`.
 
+### Live Agent Benchmarks
+
+Run curated live-LLM benchmark cases against throwaway fixture repositories:
+
+```bash
+# List available cases without API keys
+npm run benchmark -- --list
+
+# Run one live case with the default provider selection
+export GEMINI_API_KEY="your-api-key"
+npm run benchmark -- --case serializer-field-bug --agent doitforme --runs 1
+```
+
+Benchmark runs require `GEMINI_API_KEY` or `ANTHROPIC_API_KEY`. Results,
+transcripts, logs, and copied workspaces are written under ignored
+`.agent-system/runs/benchmark-*` directories. Scores are reported separately
+for task completion, safety/evidence, and efficiency.
+
 
 ---
 

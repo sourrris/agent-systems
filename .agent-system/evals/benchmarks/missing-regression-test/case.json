@@ -1,0 +1,26 @@
+{
+  "id": "missing-regression-test",
+  "title": "Add the missing normalizeEmail regression test",
+  "risk": "medium",
+  "agent": "doitforme",
+  "prompt": "Production code for normalizeEmail is already fixed, but the regression test is missing. Add a test for input ' Mixed.User@Example.COM ' expecting 'mixed.user@example.com'. Do not change src/normalize.js. Run the relevant test command.",
+  "fixtureDir": "fixture",
+  "allowedCommands": [
+    "npm test",
+    "node tests/run-tests.js"
+  ],
+  "verificationCommands": [
+    "npm test",
+    "node {caseDir}/checks/verify-regression-test.js {workspace}"
+  ],
+  "expectedChangedPaths": [
+    "tests/run-tests.js"
+  ],
+  "forbiddenChangedPaths": [
+    "src/normalize.js"
+  ],
+  "requiredTranscriptPatterns": [
+    "tests/run-tests.js",
+    "Mixed.User@Example.COM"
+  ]
+}

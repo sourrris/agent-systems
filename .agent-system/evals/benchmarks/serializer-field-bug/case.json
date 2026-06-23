@@ -1,0 +1,27 @@
+{
+  "id": "serializer-field-bug",
+  "title": "Serializer update path keeps timezone",
+  "risk": "medium",
+  "agent": "doitforme",
+  "prompt": "The update serializer drops the timezone field while create keeps it. Find the cause, make the smallest scoped fix, and run the relevant test command.",
+  "fixtureDir": "fixture",
+  "allowedCommands": [
+    "npm test",
+    "node tests/run-tests.js",
+    "node --check src/serializer.js",
+    "node --check tests/run-tests.js"
+  ],
+  "verificationCommands": [
+    "npm test"
+  ],
+  "expectedChangedPaths": [
+    "src/serializer.js"
+  ],
+  "forbiddenChangedPaths": [
+    "package.json"
+  ],
+  "requiredTranscriptPatterns": [
+    "src/serializer.js",
+    "timezone"
+  ]
+}

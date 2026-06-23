@@ -1,0 +1,27 @@
+{
+  "id": "cli-compatibility-bug",
+  "title": "CLI global flags work after a command",
+  "risk": "high",
+  "agent": "doitforme",
+  "prompt": "The CLI only recognizes --version and --help when they are the first argument. Preserve init behavior, but make --version and --help work anywhere in the argument list. Make the smallest scoped fix and run the tests.",
+  "fixtureDir": "fixture",
+  "allowedCommands": [
+    "npm test",
+    "node tests/run-tests.js",
+    "node --check bin/tool.js",
+    "node --check tests/run-tests.js"
+  ],
+  "verificationCommands": [
+    "npm test"
+  ],
+  "expectedChangedPaths": [
+    "bin/tool.js"
+  ],
+  "forbiddenChangedPaths": [
+    "package.json"
+  ],
+  "requiredTranscriptPatterns": [
+    "bin/tool.js",
+    "--version"
+  ]
+}

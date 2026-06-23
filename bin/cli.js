@@ -21,6 +21,11 @@ const LOCAL_ONLY_PATH_PATTERNS = [
 
 const UPDATE_PROPOSAL_DIR = '.agent-system/updates';
 const PROJECT_PROFILE_PATH = '.agent-system/project/profile.md';
+const BENCHMARK_AUTO_APPROVE_ENV = 'AGENT_SYSTEMS_BENCHMARK_AUTO_APPROVE';
+const BENCHMARK_WORKSPACE_ENV = 'AGENT_SYSTEMS_BENCHMARK_WORKSPACE';
+const BENCHMARK_ALLOWED_COMMANDS_ENV = 'AGENT_SYSTEMS_ALLOWED_COMMANDS';
+const TRANSCRIPT_PATH_ENV = 'AGENT_SYSTEMS_TRANSCRIPT_PATH';
+const STRICT_EXIT_ENV = 'AGENT_SYSTEMS_STRICT_EXIT';
 
 const MERGEABLE_JSON_FILES = new Set([
   '.claude/settings.json',
@@ -140,6 +145,72 @@ function resolveWorkspacePath(destDir, rawPath) {
   }
 
   return resolvedPath;
+}
+
+function parseStringListEnv(name) {
+  const rawValue = process.env[name];
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (Array.isArray(parsed)) {
+      return parsed.filter(item => typeof item === 'string');
+    }
+  } catch {
+    // Fall back to line-delimited values for manual use.
+  }
+
+  return rawValue
+    .split('\n')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+function getBenchmarkConfig(destDir) {
+  const workspaceRaw = process.env[BENCHMARK_WORKSPACE_ENV];
+  const workspace = workspaceRaw ? path.resolve(workspaceRaw) : null;
+  const autoApprove =
+    process.env[BENCHMARK_AUTO_APPROVE_ENV] === '1' &&
+    workspace &&
+    isInsideDir(workspace, destDir);
+
+  return {
+    autoApprove,
+    workspace,
+    allowedCommands: parseStringListEnv(BENCHMARK_ALLOWED_COMMANDS_ENV),
+    strictExit: process.env[STRICT_EXIT_ENV] === '1'
+  };
+}
+
+function writeTranscriptEvent(event) {
+  const transcriptPath = process.env[TRANSCRIPT_PATH_ENV];
+  if (!transcriptPath) {
+    return;
+  }
+
+  const payload = {
+    timestamp: new Date().toISOString(),
+    ...event
+  };
+  fs.mkdirSync(path.dirname(transcriptPath), { recursive: true });
+  fs.appendFileSync(transcriptPath, `${JSON.stringify(payload)}\n`, 'utf8');
+}
+
+function extractToolCalls(responseText) {
+  const toolCalls = [];
+  const toolCallPattern = /<tool_call name="([^"]+)">([\s\S]*?)<\/tool_call>/g;
+  let match;
+
+  while ((match = toolCallPattern.exec(responseText)) !== null) {
+    toolCalls.push({
+      name: match[1].trim(),
+      content: match[2]
+    });
+  }
+
+  return toolCalls;
 }
 
 function mergeJsonValue(existingValue, templateValue) {
@@ -520,6 +591,7 @@ function askConfirmation(rl, message) {
 // Tool Executor
 async function executeTool(name, content, rl, destDir) {
   console.log(`\n${colors.cyan}${colors.bright}🔧 [Executing Tool: ${name}]${colors.reset}`);
+  const benchmarkConfig = getBenchmarkConfig(destDir);
   
   if (name === 'read_file') {
     const rawPath = content.trim();
@@ -550,7 +622,12 @@ async function executeTool(name, content, rl, destDir) {
       return `Error writing file: ${err.message}`;
     }
 
-    const approved = await askConfirmation(rl, `Approve writing/updating file "${rawPath}"?`);
+    const approved =
+      benchmarkConfig.autoApprove &&
+      benchmarkConfig.workspace &&
+      isInsideDir(benchmarkConfig.workspace, filePath)
+        ? true
+        : await askConfirmation(rl, `Approve writing/updating file "${rawPath}"?`);
     if (!approved) {
       return `User rejected the write operation to "${rawPath}".`;
     }
@@ -566,8 +643,22 @@ async function executeTool(name, content, rl, destDir) {
 
   if (name === 'run_command') {
     const cmd = content.trim();
-    const approved = await askConfirmation(rl, `Approve running shell command: "${colors.bright}${cmd}${colors.reset}"?`);
+    let approved;
+    if (benchmarkConfig.autoApprove) {
+      approved = benchmarkConfig.allowedCommands.includes(cmd);
+      writeTranscriptEvent({
+        event: approved ? 'command_approved' : 'command_rejected',
+        command: cmd,
+        reason: approved ? 'benchmark allowlist match' : 'not in benchmark allowlist'
+      });
+    } else {
+      approved = await askConfirmation(rl, `Approve running shell command: "${colors.bright}${cmd}${colors.reset}"?`);
+    }
+
     if (!approved) {
+      if (benchmarkConfig.autoApprove) {
+        return `Benchmark rejected execution of command not in allowlist: "${cmd}".`;
+      }
       return `User rejected execution of command: "${cmd}".`;
     }
 
@@ -577,6 +668,11 @@ async function executeTool(name, content, rl, destDir) {
         if (stdout) result += `STDOUT:\n${stdout}\n`;
         if (stderr) result += `STDERR:\n${stderr}\n`;
         if (err) result += `Command failed with exit code ${err.code || 1}\n`;
+        writeTranscriptEvent({
+          event: 'command_finished',
+          command: cmd,
+          exitCode: err ? err.code || 1 : 0
+        });
         resolve(result || 'Command finished with no output.');
       });
     });
@@ -654,6 +750,7 @@ async function runAgent(agentName, initialPrompt) {
   const destDir = process.cwd();
   const { systemInstructions, agentInstructions } = loadAgentInstructions(agentName, destDir);
   const fullSystemPrompt = `${systemInstructions}\n\n=== Agent Persona: ${agentName} ===\n${agentInstructions}\n\n${TOOLS_DEFINITION}`;
+  const benchmarkConfig = getBenchmarkConfig(destDir);
   
   const messages = [
     { role: 'user', content: initialPrompt }
@@ -669,6 +766,14 @@ async function runAgent(agentName, initialPrompt) {
 
   let loopCount = 0;
   const maxLoops = 20;
+  let finished = false;
+  let errorMessage = null;
+
+  writeTranscriptEvent({
+    event: 'run_started',
+    agent: agentName,
+    benchmarkMode: !!benchmarkConfig.autoApprove
+  });
 
   try {
     while (loopCount < maxLoops) {
@@ -676,27 +781,52 @@ async function runAgent(agentName, initialPrompt) {
       console.log(`\n${colors.cyan}${colors.bright}--- Step ${loopCount} ---${colors.reset}`);
       
       const responseText = await callLLM(fullSystemPrompt, messages);
+      writeTranscriptEvent({
+        event: 'assistant_response',
+        agent: agentName,
+        loop: loopCount,
+        text: responseText
+      });
       
       console.log(`\n${colors.magenta}${colors.bright}Assistant:${colors.reset}\n${responseText}\n`);
       
       messages.push({ role: 'assistant', content: responseText });
       
-      const toolCallMatch = responseText.match(/<tool_call name="([\s\S]*?)">([\s\S]*?)<\/tool_call>/);
+      const toolCalls = extractToolCalls(responseText);
       
-      if (toolCallMatch) {
-        const toolName = toolCallMatch[1].trim();
-        const toolContent = toolCallMatch[2];
-        
-        const toolResult = await executeTool(toolName, toolContent, rl, destDir);
-        
-        console.log(`\n${colors.green}${colors.bright}🔧 [Tool Output]${colors.reset}\n${toolResult}\n`);
-        
-        messages.push({ 
-          role: 'user', 
-          content: `[Tool Output for ${toolName}]:\n${toolResult}` 
+      if (toolCalls.length > 0) {
+        const toolOutputs = [];
+        for (const toolCall of toolCalls) {
+          writeTranscriptEvent({
+            event: 'tool_call',
+            agent: agentName,
+            loop: loopCount,
+            toolName: toolCall.name,
+            content: toolCall.content
+          });
+
+          const toolResult = await executeTool(toolCall.name, toolCall.content, rl, destDir);
+
+          writeTranscriptEvent({
+            event: 'tool_output',
+            agent: agentName,
+            loop: loopCount,
+            toolName: toolCall.name,
+            output: toolResult
+          });
+
+          console.log(`\n${colors.green}${colors.bright}🔧 [Tool Output]${colors.reset}\n${toolResult}\n`);
+
+          toolOutputs.push(`[Tool Output for ${toolCall.name}]:\n${toolResult}`);
+        }
+
+        messages.push({
+          role: 'user',
+          content: toolOutputs.join('\n\n')
         });
       } else {
         console.log(`\n${colors.green}${colors.bright}✔ Agent finished its execution loop.${colors.reset}\n`);
+        finished = true;
         break;
       }
     }
@@ -705,10 +835,26 @@ async function runAgent(agentName, initialPrompt) {
       console.warn(`${colors.yellow}Warning: Agent reached maximum loop iterations (${maxLoops}).${colors.reset}\n`);
     }
   } catch (err) {
+    errorMessage = err.message;
     console.error(`\n${colors.red}${colors.bright}Error during execution: ${err.message}${colors.reset}\n`);
   } finally {
     rl.close();
+    writeTranscriptEvent({
+      event: 'run_finished',
+      agent: agentName,
+      loopCount,
+      finished,
+      reachedMaxLoops: loopCount >= maxLoops && !finished,
+      error: errorMessage
+    });
   }
+
+  return {
+    success: finished,
+    loopCount,
+    reachedMaxLoops: loopCount >= maxLoops && !finished,
+    error: errorMessage
+  };
 }
 
 async function main() {
@@ -785,7 +931,10 @@ async function main() {
       }
     }
     
-    await runAgent(agentName, runPrompt);
+    const runResult = await runAgent(agentName, runPrompt);
+    if (process.env[STRICT_EXIT_ENV] === '1' && !runResult.success) {
+      process.exit(1);
+    }
     process.exit(0);
   }
 
