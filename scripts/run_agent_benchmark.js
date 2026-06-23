@@ -18,11 +18,14 @@ function usage() {
   node scripts/run_agent_benchmark.js --list
 
 Options:
-  --agent <name>   Override the case default agent
-  --case <id>      Run one benchmark case
-  --label <name>   Add a label to the output directory
-  --runs <n>       Repeat each selected case n times
-  --list           List available benchmark cases without API keys
+  --agent <name>    Override the case default agent
+  --case <id>       Run one benchmark case
+  --label <name>    Add a label to the output directory
+  --runs <n>        Repeat each selected case n times
+  --list            List available benchmark cases without API keys
+  --setup-only      Prepare workspace and print prompt without running an agent
+  --verify          Verify a previously prepared workspace (requires --case and --workspace)
+  --workspace <path> Path to workspace directory (for --verify mode)
 `);
 }
 
@@ -32,7 +35,10 @@ function parseArgs(argv) {
     caseId: null,
     label: null,
     runs: 1,
-    list: false
+    list: false,
+    setupOnly: false,
+    doVerify: false,
+    workspacePath: null
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -43,6 +49,10 @@ function parseArgs(argv) {
     }
     if (arg === '--list') {
       options.list = true;
+    } else if (arg === '--setup-only') {
+      options.setupOnly = true;
+    } else if (arg === '--verify') {
+      options.doVerify = true;
     } else if (arg === '--agent') {
       options.agent = argv[++i];
     } else if (arg === '--case') {
@@ -51,6 +61,8 @@ function parseArgs(argv) {
       options.label = argv[++i];
     } else if (arg === '--runs') {
       options.runs = Number.parseInt(argv[++i], 10);
+    } else if (arg === '--workspace') {
+      options.workspacePath = path.resolve(argv[++i]);
     } else {
       throw new Error(`Unknown option: ${arg}`);
     }
@@ -112,6 +124,21 @@ function removeExposedBenchmarkCases(workspace) {
   if (fs.existsSync(exposedBenchmarkDir)) {
     fs.rmSync(exposedBenchmarkDir, { recursive: true, force: true });
   }
+}
+
+function prepareWorkspace(testCase, runDir) {
+  const workspace = path.join(runDir, 'workspace');
+  fs.mkdirSync(runDir, { recursive: true });
+  copyDir(testCase.fixturePath, workspace);
+  const initResult = runNode([cliPath, 'init', workspace], repoRoot);
+  writeCommandLogs(
+    initResult,
+    path.join(runDir, 'init.stdout.log'),
+    path.join(runDir, 'init.stderr.log')
+  );
+  removeExposedBenchmarkCases(workspace);
+  const beforeSnapshot = snapshotFiles(workspace);
+  return { workspace, initResult, beforeSnapshot };
 }
 
 function normalizeRelPath(filePath) {
@@ -374,24 +401,78 @@ function writeCommandLogs(result, stdoutPath, stderrPath) {
   fs.writeFileSync(stderrPath, result.stderr, 'utf8');
 }
 
+function verifyCase(testCase, workspace, runDir) {
+  const beforeSnapshot = snapshotFiles(testCase.fixturePath);
+
+  const verificationResults = (testCase.verificationCommands || []).map((command, index) => {
+    const expandedCommand = expandVerificationCommand(command, testCase, workspace);
+    const result = runShell(expandedCommand, workspace);
+    writeCommandLogs(
+      result,
+      path.join(runDir, `verify-${index + 1}.stdout.log`),
+      path.join(runDir, `verify-${index + 1}.stderr.log`)
+    );
+    return result;
+  });
+
+  const afterSnapshot = snapshotFiles(workspace);
+  const changedFiles = diffSnapshots(beforeSnapshot, afterSnapshot);
+  const expectedChangedPaths = testCase.expectedChangedPaths || [];
+  const forbiddenChangedPaths = testCase.forbiddenChangedPaths || [];
+  const missingExpectedChanges = expectedChangedPaths.filter(relPath => !changedFiles.includes(relPath));
+  const forbiddenChanges = forbiddenChangedPaths.filter(relPath => changedFiles.includes(relPath));
+  const verificationPassed = verificationResults.every(result => result.exitCode === 0);
+  const expectedChangesPassed = missingExpectedChanges.length === 0;
+
+  return {
+    caseId: testCase.id,
+    title: testCase.title,
+    agentName: '(manual agent)',
+    runIndex: 0,
+    paths: { runDir, workspace },
+    setup: { exitCode: 0, signal: null, stdoutPath: '', stderrPath: '' },
+    agentRun: { exitCode: 0, signal: null, stdoutPath: '', stderrPath: '' },
+    completion: {
+      passed: verificationPassed && expectedChangesPassed,
+      setupPassed: true,
+      verificationPassed,
+      expectedChangesPassed,
+      missingExpectedChanges
+    },
+    safetyEvidence: {
+      passed: forbiddenChanges.length === 0,
+      forbiddenChanges,
+      requiredTranscriptPatterns: (testCase.requiredTranscriptPatterns || []).map(pattern => ({
+        pattern,
+        matched: false
+      }))
+    },
+    efficiency: {
+      elapsedMs: 0,
+      loopCount: 0,
+      toolCallCount: 0,
+      rejectedCommandCount: 0,
+      changedFileCount: changedFiles.length
+    },
+    verification: {
+      results: verificationResults.map((result, index) => ({
+        command: result.command,
+        exitCode: result.exitCode,
+        signal: result.signal,
+        elapsedMs: result.elapsedMs,
+        stdoutPath: path.join(runDir, `verify-${index + 1}.stdout.log`),
+        stderrPath: path.join(runDir, `verify-${index + 1}.stderr.log`)
+      }))
+    },
+    changedFiles
+  };
+}
+
 function runCase(testCase, runIndex, rootRunDir, options) {
   const caseRunDir = path.join(rootRunDir, `${testCase.id}-run-${runIndex}`);
-  const workspace = path.join(caseRunDir, 'workspace');
   const agentName = options.agent || testCase.agent || 'doitforme';
   const transcriptPath = path.join(caseRunDir, 'transcript.jsonl');
-
-  fs.mkdirSync(caseRunDir, { recursive: true });
-  copyDir(testCase.fixturePath, workspace);
-
-  const initResult = runNode([cliPath, 'init', workspace], repoRoot);
-  writeCommandLogs(
-    initResult,
-    path.join(caseRunDir, 'init.stdout.log'),
-    path.join(caseRunDir, 'init.stderr.log')
-  );
-  removeExposedBenchmarkCases(workspace);
-
-  const beforeSnapshot = snapshotFiles(workspace);
+  const { workspace, initResult, beforeSnapshot } = prepareWorkspace(testCase, caseRunDir);
   const env = {
     ...process.env,
     AGENT_SYSTEMS_BENCHMARK_AUTO_APPROVE: '1',
@@ -477,8 +558,91 @@ function main() {
     return;
   }
 
+  // --- Setup-only mode: prepare workspace for the current agent ---
+  if (options.setupOnly) {
+    if (!options.caseId) {
+      throw new Error('--setup-only requires --case <id>');
+    }
+    const testCase = cases.find(c => c.id === options.caseId);
+    if (!testCase) {
+      throw new Error(`No benchmark case found for id: ${options.caseId}`);
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const label = sanitizeLabel(options.label);
+    const runDir = path.join(runsRoot, `manual-${testCase.id}-${timestamp}${label ? `-${label}` : ''}`);
+    const { workspace } = prepareWorkspace(testCase, runDir);
+
+    console.log(`\nBenchmark Case: ${testCase.id}`);
+    console.log(`Title: ${testCase.title}`);
+    console.log(`Risk: ${testCase.risk}`);
+    console.log(`Workspace: ${workspace}`);
+    console.log('─'.repeat(60));
+    console.log(`Prompt: ${testCase.prompt}`);
+    console.log('─'.repeat(60));
+    console.log('Allowed commands:');
+    for (const cmd of (testCase.allowedCommands || [])) {
+      console.log(`  ${cmd}`);
+    }
+    if (testCase.expectedChangedPaths && testCase.expectedChangedPaths.length > 0) {
+      console.log('Expected changed files:');
+      for (const p of testCase.expectedChangedPaths) {
+        console.log(`  ${p}`);
+      }
+    }
+    if (testCase.forbiddenChangedPaths && testCase.forbiddenChangedPaths.length > 0) {
+      console.log('Forbidden to change:');
+      for (const p of testCase.forbiddenChangedPaths) {
+        console.log(`  ${p}`);
+      }
+    }
+    console.log('─'.repeat(60));
+    console.log(`\nTo verify after making changes, run:\n  node scripts/run_agent_benchmark.js --verify --case ${testCase.id} --workspace ${workspace}\n`);
+    return;
+  }
+
+  // --- Verify mode: check a workspace against a case ---
+  if (options.doVerify) {
+    if (!options.caseId || !options.workspacePath) {
+      throw new Error('--verify requires --case <id> and --workspace <path>');
+    }
+    const testCase = cases.find(c => c.id === options.caseId);
+    if (!testCase) {
+      throw new Error(`No benchmark case found for id: ${options.caseId}`);
+    }
+
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const runDir = path.join(runsRoot, `verify-${testCase.id}-${timestamp}`);
+    fs.mkdirSync(runDir, { recursive: true });
+
+    const result = verifyCase(testCase, options.workspacePath, runDir);
+    fs.writeFileSync(path.join(runDir, 'summary.json'), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+    writeSummaryMarkdown(result, path.join(runDir, 'summary.md'));
+
+    const verdict = result.completion.passed && result.safetyEvidence.passed ? 'PASS' : 'FAIL';
+    console.log(`\nCase: ${result.caseId}`);
+    console.log(`Title: ${result.title}`);
+    console.log(`Completion: ${result.completion.passed ? 'PASS' : 'FAIL'}  (verification=${result.completion.verificationPassed ? 'PASS' : 'FAIL'}, expectedFiles=${result.completion.expectedChangesPassed ? 'PASS' : 'FAIL'})`);
+    console.log(`Safety/Evidence: ${result.safetyEvidence.passed ? 'PASS' : 'FAIL'}`);
+    if (result.safetyEvidence.forbiddenChanges.length > 0) {
+      console.log(`  Forbidden changes detected: ${result.safetyEvidence.forbiddenChanges.join(', ')}`);
+    }
+    if (result.completion.missingExpectedChanges.length > 0) {
+      console.log(`  Missing expected changes: ${result.completion.missingExpectedChanges.join(', ')}`);
+    }
+    console.log(`Changed files: ${result.changedFiles.join(', ') || 'none'}`);
+    console.log('');
+    for (const v of result.verification.results) {
+      console.log(`  ${v.exitCode === 0 ? 'PASS' : 'FAIL'} ${v.command}`);
+    }
+    console.log(`\nDetails in: ${runDir}`);
+
+    process.exit(result.completion.passed && result.safetyEvidence.passed ? 0 : 1);
+  }
+
+  // --- Full automated mode (requires API keys) ---
   if (!process.env.GEMINI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    throw new Error('Benchmark runs require GEMINI_API_KEY or ANTHROPIC_API_KEY. Use --list to inspect cases without API keys.');
+    throw new Error('Full benchmark runs require GEMINI_API_KEY or ANTHROPIC_API_KEY. Use --setup-only to prepare a workspace for manual agent execution, or --list to inspect cases.');
   }
 
   const selectedCases = options.caseId
