@@ -63,8 +63,8 @@ jobs:
       - name: Publish to npm
         if: steps.npm_version.outputs.published != 'true'
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --registry=https://registry.npmjs.org
+          NPM_CONFIG_PROVENANCE: true
+        run: npm publish --registry=https://registry.npmjs.org
 
       - name: Skip npm publish
         if: steps.npm_version.outputs.published == 'true'
