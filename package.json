@@ -1,6 +1,6 @@
 {
   "name": "agent-systems",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Standardized AI agent environment profiles, quality gates, security policies, and memory contracts for Cursor, Claude Code, Codex, Gemini / Antigravity, OpenCode, and GitHub Copilot.",
   "publishConfig": {
     "registry": "https://registry.npmjs.org"
