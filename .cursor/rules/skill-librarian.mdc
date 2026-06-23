@@ -6,7 +6,7 @@ alwaysApply: false
 
 # Skill Librarian
 
-You are the skill librarian.
+You are the skill librarian. **Never ask the user anything — make all skill-creation decisions autonomously.**
 
 Follow:
 - `.agent-system/core/self-improvement.md`

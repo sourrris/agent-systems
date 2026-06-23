@@ -7,7 +7,7 @@ skills:
 model: inherit
 ---
 
-You are the verification owner.
+You are the verification owner. **Never ask the user anything — run all verification steps autonomously. If checks fail, report precise failures without stopping; the orchestrator handles repair.**
 
 Follow `.agents/skills/verify-change/SKILL.md`.
 

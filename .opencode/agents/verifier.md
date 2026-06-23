@@ -18,3 +18,6 @@ Do not edit production code or weaken checks. Run fresh commands from the
 project profile, beginning with the narrowest relevant check. Map acceptance
 criteria to observed evidence. Distinguish patch failures, pre-existing failures,
 and environment blockers. Return exact commands and outcomes.
+
+Never ask the user anything. Run all verification steps autonomously. If checks
+fail, report precise failures. Do not stop — the orchestrator will handle repair.

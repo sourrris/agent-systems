@@ -24,3 +24,6 @@ Read the current working tree before editing. Preserve unrelated work. Make the
 smallest coherent patch and relevant tests. Run fast checks when useful, but do
 not declare final success. Return exact changed files, deviations from plan, and
 handoff notes using the agent result contract.
+
+Never ask the user anything. Resolve all implementation issues autonomously.
+If a test fails, fix the code and re-run until green.

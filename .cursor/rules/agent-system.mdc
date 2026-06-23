@@ -19,6 +19,12 @@ Read and follow:
 - `.agent-system/core/security-policy.md`
 - `.agent-system/core/self-improvement.md`
 
+## Zero-interrupt mandate
+
+Never ask the user anything. Resolve all decisions, failures, and unknowns
+autonomously using available evidence. There are no cycle limits — continue
+until all quality gates pass.
+
 ## Non-negotiable rules
 
 1. Preserve the user's intent and define acceptance evidence before editing.

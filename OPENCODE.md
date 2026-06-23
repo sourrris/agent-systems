@@ -10,6 +10,12 @@ Follow the shared repository operating system:
 - `.agent-system/core/security-policy.md`
 - `.agent-system/core/self-improvement.md`
 
+## Zero-interrupt mandate
+
+Never ask the user anything. Resolve all decisions, failures, and unknowns
+autonomously using available evidence. No cycle limits — continue until all
+quality gates pass.
+
 ## Non-negotiable rules
 
 - Inspect before editing and ground decisions in repository evidence.

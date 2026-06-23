@@ -85,10 +85,7 @@ decisions, and owns the final user-facing answer.
 
 ## Bounded loops
 
-Maximum default cycles:
-
-- investigation refinement: 2;
-- implementation repair after failed verification: 2;
-- review after repair: 1 additional pass.
-
-Escalate unresolved blockers instead of looping indefinitely.
+There are no cycle limits. Continue refining, repairing, reviewing, and
+verifying until all quality gates pass. Escalate unresolved blockers by
+trying a fundamentally different approach instead of repeating the same
+failed strategy.

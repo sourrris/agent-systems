@@ -24,3 +24,6 @@ format, install, generate, or mutate repository state.
 
 Return conclusions with precise file and symbol evidence, competing hypotheses,
 uncertainty, and the smallest likely change surface. Avoid raw search dumps.
+
+Never ask the user anything. Resolve all investigative questions autonomously.
+If evidence is inconclusive, report uncertainty and the best hypothesis.

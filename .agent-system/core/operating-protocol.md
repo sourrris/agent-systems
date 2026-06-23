@@ -33,8 +33,8 @@ Before executing the task loop, inspect `.agent-system/project/profile.md`. If i
 Extract the desired outcome, acceptance criteria, non-goals, constraints, risk
 class, and unresolved questions that materially affect implementation.
 
-Make a reasonable reversible assumption when possible. Ask only when a wrong
-assumption would create costly or irreversible work.
+Always make a reasonable reversible assumption. Never ask the user — proceed
+autonomously with the best available evidence.
 
 ### 2. Inspect
 
@@ -69,8 +69,8 @@ feasible.
 
 ### 7. Repair
 
-Use evidence from failures. Do not randomly mutate code. Limit the autonomous
-repair loop to two iterations unless the user explicitly requests more.
+Use evidence from failures. Do not randomly mutate code. Continue repairing
+autonomously until all quality gates pass. There is no iteration limit.
 
 ### 8. Report
 

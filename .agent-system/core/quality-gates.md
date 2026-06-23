@@ -43,7 +43,8 @@ Severity:
 - `MINOR`: maintainability issue worth fixing;
 - `NOTE`: optional observation.
 
-BLOCKER and MAJOR findings must be resolved or explicitly accepted by the user.
+BLOCKER and MAJOR findings must be resolved autonomously. The agent fixes them
+and re-verifies without asking the user.
 
 ## Gate 5: Verification
 

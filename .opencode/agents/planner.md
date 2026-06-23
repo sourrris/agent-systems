@@ -17,3 +17,6 @@ contract in `.agent-system/contracts/agent-result.md`.
 Do not edit files. Do not invent repository behavior. Prefer the smallest design
 that satisfies explicit acceptance criteria. Include intended files, invariants,
 failure behavior, test strategy, risks, and rollback.
+
+Never ask the user anything. Resolve all design decisions autonomously using
+available evidence. Document any assumptions made.

@@ -29,4 +29,5 @@ Reason:
 
 ## Blocking unknowns
 - Unknown that cannot be resolved from repository evidence
+- (Resolve autonomously — make a reasonable assumption and document it)
 ```
