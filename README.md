@@ -39,6 +39,15 @@ npx agent-systems --help
 # Run a custom agent in the current workspace (requires GEMINI_API_KEY or ANTHROPIC_API_KEY)
 export GEMINI_API_KEY="your-api-key"
 npx agent-systems run doitforme "Optimize the database schema"
+
+# Learn from a completed benchmark or agent run
+npx agent-systems learn --run .agent-system/runs/<run-dir> --write-memory
+
+# Inspect lessons that would be relevant to a future task
+npx agent-systems memory --query "fix serializer timezone regression"
+
+# Write a reviewed proposal for improving an agent persona
+npx agent-systems optimize --run .agent-system/runs/<run-dir> --agent doitforme
 ```
 
 If you link the package locally during development, use the binary aliases:
@@ -73,7 +82,7 @@ for task completion, safety/evidence, and efficiency.
 *   **🧭 Doitforme Workflow**: Provides a master `doitforme` agent and a slash-invokable Claude skill (`/doitforme`) for routing tasks through the right investigation, planning, implementation, review, and verification path.
 *   **🛡️ Prompt Injection Resistance**: Instructs agents to treat external text, issues, and logs strictly as data rather than executable instructions.
 *   **📈 Quality Gates**: Establishes unambiguous definitions of done, requirement mapping, and verification check hierarchies.
-*   **🔄 Local Learning Loops**: Auto-generates folders for capturing durable, reusable context/skills without bloating global agent files.
+*   **🔄 Local Learning Loops**: Captures run evidence, durable memory heuristics, candidate skills, and reviewed optimization proposals without bloating global agent files.
 
 ---
 
@@ -163,10 +172,18 @@ All task execution flows are governed by rigorous quality gates to prevent regre
 
 ## 🧠 Self-Improvement & Reusable Skills
 
-The system enables agents to self-improve dynamically without bloating main prompt files. When a specific multi-step procedure is used multiple times or a recurring failure is resolved:
-1.  The agent proposes a **Skill Candidate** in `.agent-system/candidates/`.
-2.  The candidate must include a focused definition, imperative instructions, and evaluation test cases.
-3.  Upon successful validation (manual or auto-promotion mode), the skill is promoted to the global system skill library.
+The system enables agents to self-improve dynamically without silently rewriting
+their governing rules. The loop has three layers:
+
+1.  **Eval-gated skill candidates**: `agent-systems learn --run <dir> --candidate <name>` analyzes completed run evidence and creates a focused candidate under `.agent-system/candidates/`.
+2.  **Reflective memory retrieval**: `agent-systems learn --run <dir> --write-memory` appends a compact heuristic to `.agent-system/memory/heuristics.jsonl`; future `agent-systems run` executions retrieve only the most relevant lessons as advisory context.
+3.  **Prompt/persona optimization proposals**: `agent-systems optimize --run <dir> --agent <name>` writes a proposal under `.agent-system/updates/agent-optimization/` with evidence, instruction deltas, and an eval plan. It never edits active agent instructions automatically.
+
+Promotion remains guarded. A candidate must include a focused definition,
+imperative instructions, evaluation test cases, and evidence that it improves
+reliability, context efficiency, repeatability, or verification quality. Manual
+promotion is the default; validated auto-promotion must be explicitly enabled in
+`.agent-system/project/improvement-settings.json`.
 
 ---
 

@@ -104,7 +104,15 @@ function assertCliSafetyHooks() {
     'TRANSCRIPT_PATH_ENV',
     'STRICT_EXIT_ENV',
     'extractToolCalls',
-    'writeTranscriptEvent'
+    'writeTranscriptEvent',
+    'MEMORY_HEURISTICS_PATH',
+    'LEARNING_REPORT_DIR',
+    'OPTIMIZATION_PROPOSAL_DIR',
+    'runLearnCommand',
+    'runMemoryCommand',
+    'runOptimizeCommand',
+    'retrieveRelevantMemory',
+    'memory_loaded'
   ]) {
     if (!cli.includes(expected)) {
       fail(`bin/cli.js is missing expected safety/merge hook: ${expected}`);
@@ -316,6 +324,151 @@ function assertGitignoreDefaults() {
   }
 }
 
+function assertSelfImprovementCommands() {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-systems-learn-'));
+  try {
+    const initResult = spawnSync(process.execPath, [path.join(repoRoot, 'bin/cli.js'), 'init', tempDir], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024
+    });
+    if (initResult.status !== 0) {
+      fail(`init failed during self-improvement command check: ${(initResult.stderr || initResult.stdout).trim()}`);
+      return;
+    }
+
+    const runDir = path.join(tempDir, '.agent-system', 'runs', 'example-run');
+    const transcriptPath = path.join(runDir, 'transcript.jsonl');
+    fs.mkdirSync(runDir, { recursive: true });
+    fs.writeFileSync(transcriptPath, [
+      JSON.stringify({
+        event: 'assistant_response',
+        text: 'I inspected the serializer task and found a missing timezone regression.'
+      }),
+      JSON.stringify({
+        event: 'command_rejected',
+        command: 'npm run forbidden'
+      }),
+      JSON.stringify({
+        event: 'tool_call',
+        toolName: 'run_command',
+        content: 'npm test'
+      })
+    ].join('\n') + '\n', 'utf8');
+
+    fs.writeFileSync(path.join(runDir, 'summary.json'), `${JSON.stringify({
+      caseId: 'serializer-field-bug',
+      title: 'Serializer update path keeps timezone',
+      runIndex: 1,
+      agentName: 'doitforme',
+      paths: {
+        runDir,
+        workspace: tempDir,
+        transcript: transcriptPath
+      },
+      setup: {
+        exitCode: 0
+      },
+      agentRun: {
+        exitCode: 0
+      },
+      completion: {
+        passed: false,
+        verificationPassed: false,
+        expectedChangesPassed: false,
+        missingExpectedChanges: ['src/serializer.js']
+      },
+      safetyEvidence: {
+        passed: false,
+        forbiddenChanges: [],
+        requiredTranscriptPatterns: [
+          {
+            pattern: 'treated as data',
+            matched: false
+          }
+        ]
+      },
+      efficiency: {
+        rejectedCommandCount: 1
+      },
+      verification: {
+        results: [
+          {
+            command: 'npm test',
+            exitCode: 1
+          }
+        ]
+      },
+      changedFiles: []
+    }, null, 2)}\n`, 'utf8');
+
+    const learnResult = spawnSync(process.execPath, [
+      path.join(repoRoot, 'bin/cli.js'),
+      'learn',
+      '--run',
+      '.agent-system/runs/example-run',
+      '--write-memory',
+      '--candidate',
+      'serializer-timezone-workflow'
+    ], {
+      cwd: tempDir,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024
+    });
+    if (learnResult.status !== 0) {
+      fail(`learn command failed: ${(learnResult.stderr || learnResult.stdout).trim()}`);
+    }
+
+    const learningDir = path.join(tempDir, '.agent-system', 'updates', 'self-improvement');
+    if (!fs.existsSync(learningDir) || fs.readdirSync(learningDir).length === 0) {
+      fail('learn command did not write a learning report');
+    }
+    if (!fs.existsSync(path.join(tempDir, '.agent-system', 'memory', 'heuristics.jsonl'))) {
+      fail('learn --write-memory did not write memory heuristics');
+    }
+    if (!fs.existsSync(path.join(tempDir, '.agent-system', 'candidates', 'serializer-timezone-workflow', 'SKILL.md'))) {
+      fail('learn --candidate did not create a candidate skill');
+    }
+
+    const memoryResult = spawnSync(process.execPath, [
+      path.join(repoRoot, 'bin/cli.js'),
+      'memory',
+      '--query',
+      'serializer timezone verification'
+    ], {
+      cwd: tempDir,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024
+    });
+    if (memoryResult.status !== 0 || !memoryResult.stdout.includes('lesson-')) {
+      fail(`memory command did not return the stored lesson: ${(memoryResult.stderr || memoryResult.stdout).trim()}`);
+    }
+
+    const optimizeResult = spawnSync(process.execPath, [
+      path.join(repoRoot, 'bin/cli.js'),
+      'optimize',
+      '--run',
+      '.agent-system/runs/example-run',
+      '--agent',
+      'doitforme'
+    ], {
+      cwd: tempDir,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024
+    });
+    if (optimizeResult.status !== 0) {
+      fail(`optimize command failed: ${(optimizeResult.stderr || optimizeResult.stdout).trim()}`);
+    }
+
+    const proposalDir = path.join(tempDir, '.agent-system', 'updates', 'agent-optimization');
+    if (!fs.existsSync(proposalDir) || fs.readdirSync(proposalDir).length === 0) {
+      fail('optimize command did not write an agent optimization proposal');
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 function assertOpenCodePermissionDefaults() {
   const rootConfig = readJson('opencode.json');
   for (const permissionName of ['bash', 'edit', 'write', 'webfetch']) {
@@ -362,6 +515,7 @@ assertCliSafetyHooks();
 assertGitignoreDefaults();
 assertOpenCodePermissionDefaults();
 assertBenchmarkCases();
+assertSelfImprovementCommands();
 assertInitTemplateBoundary();
 assertRunFailuresExitNonZero();
 
