@@ -2,6 +2,7 @@
 
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { spawnSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
@@ -37,10 +38,14 @@ function assertPackageBoundary(pkg) {
   }
 
   const packageFiles = pkg.files || [];
-  for (const forbidden of ['.agent-system', '.claude', '.opencode']) {
+  for (const forbidden of ['.agent-system', '.claude', '.opencode', '.github']) {
     if (packageFiles.includes(forbidden)) {
       fail(`package.json files must not include broad local-only directory: ${forbidden}`);
     }
+  }
+
+  if (packageFiles.includes('.github/workflows') || packageFiles.includes('.github/workflows/release-package.yml')) {
+    fail('package.json must not ship this repository release workflow to target projects');
   }
 
   for (const required of [
@@ -50,7 +55,8 @@ function assertPackageBoundary(pkg) {
     '.claude/settings.json',
     '.claude/agents',
     '.claude/skills',
-    '.opencode/agents'
+    '.opencode/agents',
+    '.github/copilot-instructions.md'
   ]) {
     if (!packageFiles.includes(required)) {
       fail(`package.json files is missing expected package entry: ${required}`);
@@ -87,7 +93,12 @@ function assertCliSafetyHooks() {
     'MERGEABLE_MARKDOWN_FILES',
     'writeUpdateProposal',
     'resolveWorkspacePath',
+    'nearestExistingPath',
     'isProtectedRelPath',
+    '.agent-system\\/evals\\/benchmarks',
+    '.github\\/workflows',
+    '.npmrc',
+    '.ssh',
     'BENCHMARK_AUTO_APPROVE_ENV',
     'BENCHMARK_ALLOWED_COMMANDS_ENV',
     'TRANSCRIPT_PATH_ENV',
@@ -98,6 +109,63 @@ function assertCliSafetyHooks() {
     if (!cli.includes(expected)) {
       fail(`bin/cli.js is missing expected safety/merge hook: ${expected}`);
     }
+  }
+}
+
+function assertInitTemplateBoundary() {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-systems-init-'));
+  try {
+    const result = spawnSync(process.execPath, [path.join(repoRoot, 'bin/cli.js'), 'init', tempDir], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024
+    });
+
+    if (result.status !== 0) {
+      fail(`bin/cli.js init failed during template boundary check: ${(result.stderr || result.stdout).trim()}`);
+      return;
+    }
+
+    for (const required of [
+      '.github/copilot-instructions.md',
+      '.opencode/agents/doitforme.md',
+      '.agent-system/core/security-policy.md'
+    ]) {
+      if (!fs.existsSync(path.join(tempDir, required))) {
+        fail(`init did not install expected template: ${required}`);
+      }
+    }
+
+    for (const forbidden of [
+      '.github/workflows/release-package.yml',
+      '.agent-system/evals/benchmarks',
+      '.opencode/node_modules',
+      '.opencode/package.json',
+      '.opencode/package-lock.json'
+    ]) {
+      if (fs.existsSync(path.join(tempDir, forbidden))) {
+        fail(`init installed local-only file or directory: ${forbidden}`);
+      }
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function assertRunFailuresExitNonZero() {
+  const env = { ...process.env };
+  delete env.GEMINI_API_KEY;
+  delete env.ANTHROPIC_API_KEY;
+
+  const result = spawnSync(process.execPath, [path.join(repoRoot, 'bin/cli.js'), 'run', 'doitforme', 'hello'], {
+    cwd: repoRoot,
+    env,
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024
+  });
+
+  if (result.status === 0) {
+    fail('agent-systems run must exit non-zero when provider setup fails');
   }
 }
 
@@ -248,6 +316,33 @@ function assertGitignoreDefaults() {
   }
 }
 
+function assertOpenCodePermissionDefaults() {
+  const rootConfig = readJson('opencode.json');
+  for (const permissionName of ['bash', 'edit', 'write', 'webfetch']) {
+    if (rootConfig.permission?.[permissionName] !== 'ask') {
+      fail(`opencode.json must default ${permissionName} permission to ask`);
+    }
+  }
+
+  const agentPermissionExpectations = {
+    '.opencode/agents/doitforme.md': ['bash: ask', 'edit: ask', 'write: ask'],
+    '.opencode/agents/implementer.md': ['bash: ask', 'edit: ask', 'write: ask'],
+    '.opencode/agents/investigator.md': ['bash: ask'],
+    '.opencode/agents/reviewer.md': ['bash: ask'],
+    '.opencode/agents/skill-librarian.md': ['bash: ask', 'edit: ask', 'write: ask'],
+    '.opencode/agents/verifier.md': ['bash: ask']
+  };
+
+  for (const [relPath, expectedSnippets] of Object.entries(agentPermissionExpectations)) {
+    const content = readText(relPath);
+    for (const expectedSnippet of expectedSnippets) {
+      if (!content.includes(expectedSnippet)) {
+        fail(`${relPath} must include safer permission default: ${expectedSnippet}`);
+      }
+    }
+  }
+}
+
 const pkg = JSON.parse(readText('package.json'));
 
 for (const relPath of [
@@ -265,7 +360,10 @@ assertPackageBoundary(pkg);
 assertNoMissingValidatorReferences();
 assertCliSafetyHooks();
 assertGitignoreDefaults();
+assertOpenCodePermissionDefaults();
 assertBenchmarkCases();
+assertInitTemplateBoundary();
+assertRunFailuresExitNonZero();
 
 if (failures.length > 0) {
   console.error('Agent system validation failed:');

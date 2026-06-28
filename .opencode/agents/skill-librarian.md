@@ -3,9 +3,9 @@ name: skill-librarian
 description: Self-improvement librarian. Use after substantial work to create eval-ready candidate skills from repeated proven workflows.
 permission:
   read: allow
-  edit: allow
-  write: allow
-  bash: allow
+  edit: ask
+  write: ask
+  bash: ask
   skill: allow
 skills:
   - learn-from-run

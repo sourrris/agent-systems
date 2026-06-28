@@ -3,9 +3,9 @@ name: doitforme
 description: Master controller agent. Use to run any task; it automatically determines the optimal subagent routing, designs the plan, and coordinates the execution loop.
 permission:
   read: allow
-  edit: allow
-  bash: allow
-  write: allow
+  edit: ask
+  bash: ask
+  write: ask
   agent: allow
   skill: allow
 skills:

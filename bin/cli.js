@@ -14,8 +14,11 @@ const packageRoot = path.resolve(__dirname, '..');
 const LOCAL_ONLY_PATH_PATTERNS = [
   /(^|\/)\.DS_Store$/,
   /(^|\/)[^/]*\.local\.json$/,
+  /(^|\/)\.agent-system\/evals\/benchmarks(\/|$)/,
   /(^|\/)\.agent-system\/(runs|tmp|updates)(\/|$)/,
+  /(^|\/)\.github\/workflows(\/|$)/,
   /(^|\/)\.opencode\/\.gitignore$/,
+  /(^|\/)\.opencode\/(node_modules|package\.json|package-lock\.json|bun\.lock)(\/|$)/,
   /(^|\/)[^/]*\.(log|tmp)$/
 ];
 
@@ -42,7 +45,17 @@ const MERGEABLE_MARKDOWN_FILES = new Set([
 ]);
 
 const PROTECTED_PATH_PATTERNS = [
-  /(^|\/)\.env($|\.)/,
+  /(^|\/)\.env($|[./])/,
+  /(^|\/)\.npmrc$/,
+  /(^|\/)\.pypirc$/,
+  /(^|\/)\.netrc$/,
+  /(^|\/)\.git-credentials$/,
+  /(^|\/)\.gitconfig$/,
+  /(^|\/)\.git\/config$/,
+  /(^|\/)\.ssh(\/|$)/,
+  /(^|\/)\.aws(\/|$)/,
+  /(^|\/)\.config\/gh(\/|$)/,
+  /(^|\/)\.docker\/config\.json$/,
   /(^|\/)secrets(\/|$)/,
   /(^|\/)credentials(\/|$)/,
   /(^|\/)[^/]*\.pem$/,
@@ -133,7 +146,20 @@ function isProtectedRelPath(relPath) {
   return PROTECTED_PATH_PATTERNS.some(pattern => pattern.test(normalized));
 }
 
+function nearestExistingPath(targetPath) {
+  let currentPath = targetPath;
+  while (!fs.existsSync(currentPath)) {
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) {
+      return null;
+    }
+    currentPath = parentPath;
+  }
+  return currentPath;
+}
+
 function resolveWorkspacePath(destDir, rawPath) {
+  const workspaceRoot = fs.realpathSync(destDir);
   const resolvedPath = path.resolve(destDir, rawPath || '.');
   if (!isInsideDir(destDir, resolvedPath)) {
     throw new Error(`Path escapes the workspace: ${rawPath}`);
@@ -141,6 +167,22 @@ function resolveWorkspacePath(destDir, rawPath) {
 
   const relativePath = normalizeRelPath(path.relative(destDir, resolvedPath));
   if (relativePath && isProtectedRelPath(relativePath)) {
+    throw new Error(`Protected path cannot be accessed: ${rawPath}`);
+  }
+
+  const existingPath = nearestExistingPath(resolvedPath);
+  if (!existingPath) {
+    throw new Error(`Path cannot be resolved inside the workspace: ${rawPath}`);
+  }
+
+  const existingRealPath = fs.realpathSync(existingPath);
+  const realTargetPath = path.resolve(existingRealPath, path.relative(existingPath, resolvedPath));
+  if (!isInsideDir(workspaceRoot, realTargetPath)) {
+    throw new Error(`Path escapes the workspace through a symlink: ${rawPath}`);
+  }
+
+  const realRelativePath = normalizeRelPath(path.relative(workspaceRoot, realTargetPath));
+  if (realRelativePath && isProtectedRelPath(realRelativePath)) {
     throw new Error(`Protected path cannot be accessed: ${rawPath}`);
   }
 
@@ -932,10 +974,7 @@ async function main() {
     }
     
     const runResult = await runAgent(agentName, runPrompt);
-    if (process.env[STRICT_EXIT_ENV] === '1' && !runResult.success) {
-      process.exit(1);
-    }
-    process.exit(0);
+    process.exit(runResult.success ? 0 : 1);
   }
 
   if (command !== 'init') {
@@ -962,12 +1001,14 @@ async function main() {
   const ITEMS_TO_COPY = [
     '.agent-system',
     '.agents',
-    '.claude',
+    '.claude/agents',
+    '.claude/skills',
+    '.claude/settings.json',
     '.codex',
     '.cursor',
     '.gemini',
-    '.github',
-    '.opencode',
+    '.github/copilot-instructions.md',
+    '.opencode/agents',
     'AGENTS.md',
     'CLAUDE.md',
     'GEMINI.md',

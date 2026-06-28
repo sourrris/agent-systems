@@ -3,7 +3,7 @@ name: investigator
 description: Read-only codebase investigator. Use to trace execution paths, gather evidence, compare hypotheses, and locate tests before non-trivial changes.
 permission:
   read: allow
-  bash: allow
+  bash: ask
   skill: allow
 skills:
   - codebase-investigation

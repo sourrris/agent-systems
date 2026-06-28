@@ -3,9 +3,9 @@ name: implementer
 description: Implementation owner for an already investigated and planned coding task. Use for focused edits and tests; do not use as the final reviewer.
 permission:
   read: allow
-  edit: allow
-  bash: allow
-  write: allow
+  edit: ask
+  bash: ask
+  write: ask
   skill: allow
 skills:
   - implement-change

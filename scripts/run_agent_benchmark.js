@@ -141,6 +141,22 @@ function prepareWorkspace(testCase, runDir) {
   return { workspace, initResult, beforeSnapshot };
 }
 
+function prepareBaselineSnapshot(testCase, runDir) {
+  const baselineWorkspace = path.join(runDir, 'baseline-workspace');
+  copyDir(testCase.fixturePath, baselineWorkspace);
+  const initResult = runNode([cliPath, 'init', baselineWorkspace], repoRoot);
+  writeCommandLogs(
+    initResult,
+    path.join(runDir, 'baseline-init.stdout.log'),
+    path.join(runDir, 'baseline-init.stderr.log')
+  );
+  removeExposedBenchmarkCases(baselineWorkspace);
+  return {
+    initResult,
+    beforeSnapshot: snapshotFiles(baselineWorkspace)
+  };
+}
+
 function normalizeRelPath(filePath) {
   return filePath.split(path.sep).join('/');
 }
@@ -402,7 +418,7 @@ function writeCommandLogs(result, stdoutPath, stderrPath) {
 }
 
 function verifyCase(testCase, workspace, runDir) {
-  const beforeSnapshot = snapshotFiles(testCase.fixturePath);
+  const { initResult, beforeSnapshot } = prepareBaselineSnapshot(testCase, runDir);
 
   const verificationResults = (testCase.verificationCommands || []).map((command, index) => {
     const expandedCommand = expandVerificationCommand(command, testCase, workspace);
@@ -423,6 +439,11 @@ function verifyCase(testCase, workspace, runDir) {
   const forbiddenChanges = forbiddenChangedPaths.filter(relPath => changedFiles.includes(relPath));
   const verificationPassed = verificationResults.every(result => result.exitCode === 0);
   const expectedChangesPassed = missingExpectedChanges.length === 0;
+  const requiredPatternResults = (testCase.requiredTranscriptPatterns || []).map(pattern => ({
+    pattern,
+    matched: false
+  }));
+  const transcriptEvidencePassed = requiredPatternResults.length === 0;
 
   return {
     caseId: testCase.id,
@@ -430,22 +451,25 @@ function verifyCase(testCase, workspace, runDir) {
     agentName: '(manual agent)',
     runIndex: 0,
     paths: { runDir, workspace },
-    setup: { exitCode: 0, signal: null, stdoutPath: '', stderrPath: '' },
+    setup: {
+      exitCode: initResult.exitCode,
+      signal: initResult.signal,
+      stdoutPath: path.join(runDir, 'baseline-init.stdout.log'),
+      stderrPath: path.join(runDir, 'baseline-init.stderr.log')
+    },
     agentRun: { exitCode: 0, signal: null, stdoutPath: '', stderrPath: '' },
     completion: {
-      passed: verificationPassed && expectedChangesPassed,
-      setupPassed: true,
+      passed: initResult.exitCode === 0 && verificationPassed && expectedChangesPassed,
+      setupPassed: initResult.exitCode === 0,
       verificationPassed,
       expectedChangesPassed,
       missingExpectedChanges
     },
     safetyEvidence: {
-      passed: forbiddenChanges.length === 0,
+      passed: forbiddenChanges.length === 0 && transcriptEvidencePassed,
       forbiddenChanges,
-      requiredTranscriptPatterns: (testCase.requiredTranscriptPatterns || []).map(pattern => ({
-        pattern,
-        matched: false
-      }))
+      requiredTranscriptPatterns: requiredPatternResults,
+      transcriptEvidenceAvailable: false
     },
     efficiency: {
       elapsedMs: 0,

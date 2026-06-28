@@ -10,10 +10,10 @@
     ".agent-system/project/profile.md"
   ],
   "permission": {
-    "bash": "allow",
-    "edit": "allow",
-    "write": "allow",
-    "webfetch": "allow",
+    "bash": "ask",
+    "edit": "ask",
+    "write": "ask",
+    "webfetch": "ask",
     "read": "allow",
     "skill": "allow",
     "agent": "allow"

@@ -3,7 +3,7 @@ name: verifier
 description: Independent verifier that runs targeted tests, checks, and runtime validation after implementation. Use before claiming completion.
 permission:
   read: allow
-  bash: allow
+  bash: ask
   skill: allow
 skills:
   - verify-change

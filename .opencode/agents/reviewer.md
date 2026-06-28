@@ -3,7 +3,7 @@ name: reviewer
 description: Independent read-only reviewer of a completed diff. Use to find correctness, security, compatibility, regression, and test gaps before completion.
 permission:
   read: allow
-  bash: allow
+  bash: ask
   skill: allow
 skills:
   - review-diff
